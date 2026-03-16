@@ -109,22 +109,22 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-### 4. (Optional) Start background trackers
+### 4. Start background trackers
 
 ```bash
 npm run watch-browser   # browser tab tracker
 npm run watch-windows   # macOS app/window tracker
 ```
 
-These run as background daemons. To have them start automatically on login:
+These run as background daemons and are required for full tracking coverage. Without them, only Claude Code prompts are captured. To have them start automatically on login:
 
 ```bash
 node scripts/install-launch-agent.mjs
 ```
 
-### 5. (Optional) Connect your calendar
+### 5. Connect your calendar
 
-Go to Settings and paste an ICS URL from Google Calendar or Outlook. PM Pulse syncs it every 30 minutes.
+Go to Settings and paste an ICS URL from Google Calendar or Outlook. PM Pulse syncs it every 30 minutes. Without this, meetings won't appear in your activity timeline.
 
 ---
 
