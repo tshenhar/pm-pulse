@@ -1,0 +1,76 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e5]:
+          - link [ref=e6] [cursor=pointer]:
+            - /url: /
+            - button [ref=e7]:
+              - img
+          - generic [ref=e8]:
+            - generic [ref=e9]: P
+            - heading "Trends" [level=1] [ref=e10]
+        - generic [ref=e11]:
+          - button "Week" [ref=e12]
+          - button "Month" [ref=e13]
+    - main [ref=e14]:
+      - generic [ref=e15]:
+        - generic [ref=e17]:
+          - img [ref=e19]
+          - generic [ref=e22]:
+            - paragraph [ref=e23]: Total Time
+            - paragraph [ref=e24]: 18h 11m
+        - generic [ref=e26]:
+          - img [ref=e28]
+          - generic [ref=e30]:
+            - paragraph [ref=e31]: Total Prompts
+            - paragraph [ref=e32]: "175"
+        - generic [ref=e34]:
+          - img [ref=e36]
+          - generic [ref=e39]:
+            - paragraph [ref=e40]: Avg / Active Day
+            - paragraph [ref=e41]: 6h 4m
+      - generic [ref=e42]:
+        - generic [ref=e44]: Daily Hours
+        - application [ref=e49]:
+          - generic [ref=e66]:
+            - generic [ref=e67]:
+              - generic [ref=e69]: Mar 8
+              - generic [ref=e71]: Mar 9
+              - generic [ref=e73]: Mar 10
+              - generic [ref=e75]: Mar 11
+              - generic [ref=e77]: Mar 12
+              - generic [ref=e79]: Mar 13
+              - generic [ref=e81]: Mar 14
+            - generic [ref=e82]:
+              - generic [ref=e84]: 0h
+              - generic [ref=e86]: 4h
+              - generic [ref=e88]: 8h
+              - generic [ref=e90]: 12h
+              - generic [ref=e92]: 16h
+      - generic [ref=e93]:
+        - generic [ref=e95]: Time by Category (7 days)
+        - application [ref=e100]:
+          - generic [ref=e130]:
+            - generic [ref=e131]:
+              - generic [ref=e133]: 0m
+              - generic [ref=e135]: 3h 20m
+              - generic [ref=e137]: 6h 40m
+              - generic [ref=e139]: 10h
+              - generic [ref=e141]: 13h 20m
+            - generic [ref=e142]:
+              - generic [ref=e144]: Personal Productivity
+              - generic [ref=e146]: Development &Technical
+              - generic [ref=e148]: Communication &Alignment
+              - generic [ref=e150]: Analytics &Experimentation
+              - generic [ref=e152]: Strategy & Planning
+              - generic [ref=e154]: Requirements &Specifications
+              - generic [ref=e156]: Writing &Documentation
+  - button "Open Next.js Dev Tools" [ref=e162] [cursor=pointer]:
+    - img [ref=e163]
+  - alert [ref=e166]
+  - generic [ref=e167]: Personal Productivity
+```

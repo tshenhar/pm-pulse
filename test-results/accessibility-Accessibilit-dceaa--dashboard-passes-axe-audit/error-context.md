@@ -1,0 +1,277 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e5]:
+          - generic [ref=e6]: P
+          - heading "PM Pulse" [level=1] [ref=e7]
+        - generic [ref=e8]:
+          - link "Trends" [ref=e9] [cursor=pointer]:
+            - /url: /trends
+            - button "Trends" [ref=e10]:
+              - img
+          - link "Training" [ref=e11] [cursor=pointer]:
+            - /url: /training
+            - button "Training" [ref=e12]:
+              - img
+          - link "Settings" [ref=e13] [cursor=pointer]:
+            - /url: /settings
+            - button "Settings" [ref=e14]:
+              - img
+          - button "Export CSV" [ref=e15]:
+            - img
+          - button "Previous day" [ref=e17]:
+            - img
+          - generic [ref=e18]: Today
+          - button "Next day" [disabled]:
+            - img
+          - button "Refresh" [ref=e19]:
+            - img
+          - generic [ref=e20]: Live
+    - generic [ref=e22]:
+      - main [ref=e23]:
+        - heading "Saturday — Here's your PM work breakdown for today" [level=2] [ref=e25]
+        - generic [ref=e26]:
+          - generic [ref=e28]:
+            - img [ref=e30]
+            - generic [ref=e33]:
+              - paragraph [ref=e34]: Total Time
+              - paragraph [ref=e35]: 1h 4m
+              - generic [ref=e36]:
+                - img [ref=e37]
+                - text: "-13h 48m"
+          - generic [ref=e41]:
+            - img [ref=e43]
+            - generic [ref=e45]:
+              - paragraph [ref=e46]: Meetings
+              - paragraph [ref=e47]: "0"
+              - generic [ref=e48]:
+                - img [ref=e49]
+                - text: "-3"
+          - generic [ref=e53]:
+            - img [ref=e55]
+            - generic [ref=e57]:
+              - paragraph [ref=e58]: Focus Time
+              - paragraph [ref=e59]: 1h 4m
+              - generic [ref=e60]:
+                - img [ref=e61]
+                - text: "-20h 5m"
+          - generic [ref=e65]:
+            - img [ref=e67]
+            - generic [ref=e73]:
+              - paragraph [ref=e74]: Top Category
+              - paragraph [ref=e75]: Development
+        - generic [ref=e76]:
+          - generic [ref=e77]:
+            - generic [ref=e79]: Time by Category
+            - generic [ref=e81]:
+              - application [ref=e85]
+              - generic [ref=e110]:
+                - generic [ref=e111]:
+                  - generic [ref=e113]: Development & Technical
+                  - generic [ref=e114]: 66%
+                - generic [ref=e115]:
+                  - generic [ref=e117]: Personal Productivity
+                  - generic [ref=e118]: 15%
+                - generic [ref=e119]:
+                  - generic [ref=e121]: Communication & Alignment
+                  - generic [ref=e122]: 14%
+                - generic [ref=e123]:
+                  - generic [ref=e125]: Requirements & Specifications
+                  - generic [ref=e126]: 2%
+                - generic [ref=e127]:
+                  - generic [ref=e129]: Writing & Documentation
+                  - generic [ref=e130]: 2%
+                - generic [ref=e131]:
+                  - generic [ref=e133]: Analytics & Experimentation
+                  - generic [ref=e134]: 1%
+                - generic [ref=e135]:
+                  - generic [ref=e137]: Strategy & Planning
+                  - generic [ref=e138]: 0%
+          - generic [ref=e139]:
+            - generic [ref=e141]: How I Worked
+            - generic [ref=e143]:
+              - generic [ref=e145]:
+                - generic [ref=e146]:
+                  - generic [ref=e147]: 🤖
+                  - text: Claude
+                - generic [ref=e148]: 19m
+              - generic [ref=e152]:
+                - generic [ref=e153]:
+                  - generic [ref=e154]: 📅
+                  - text: Meetings
+                - generic [ref=e155]: —
+              - generic [ref=e158]:
+                - generic [ref=e159]:
+                  - generic [ref=e160]: 🖥
+                  - text: Apps
+                - generic [ref=e161]: 39m
+              - generic [ref=e165]:
+                - generic [ref=e166]:
+                  - generic [ref=e167]: 🌐
+                  - text: Browser
+                - generic [ref=e168]: 6m
+        - generic [ref=e171]:
+          - generic [ref=e173]:
+            - generic [ref=e174]: Activity
+            - generic [ref=e175]:
+              - generic [ref=e176]:
+                - button "10" [ref=e177]
+                - button "50" [ref=e178]
+                - button "100" [ref=e179]
+              - button "Export current view as CSV" [ref=e180]:
+                - img
+          - generic [ref=e181]:
+            - table [ref=e183]:
+              - rowgroup [ref=e184]:
+                - row "Time Source Activity Category Confidence Duration" [ref=e185]:
+                  - columnheader [ref=e186]
+                  - columnheader "Time" [ref=e187]
+                  - columnheader "Source" [ref=e188]
+                  - columnheader "Activity" [ref=e189]
+                  - columnheader "Category" [ref=e190]
+                  - columnheader "Confidence" [ref=e191]
+                  - columnheader "Duration" [ref=e192]
+              - rowgroup [ref=e193]:
+                - row "2:26 PM Claude ccan you share a summary of recent activities from last 3 days communication/stakeholder 85% 1m" [ref=e194] [cursor=pointer]:
+                  - cell [ref=e195]:
+                    - img [ref=e196]
+                  - cell "2:26 PM" [ref=e198]
+                  - cell "Claude" [ref=e199]:
+                    - generic [ref=e200]: Claude
+                  - cell "ccan you share a summary of recent activities from last 3 days" [ref=e201]
+                  - cell "communication/stakeholder" [ref=e202]:
+                    - generic [ref=e203]: communication/stakeholder
+                  - cell "85%" [ref=e204]:
+                    - generic [ref=e206]: 85%
+                  - cell "1m" [ref=e207]
+                - row "2:27 PM Window Visual Studio Code development/coding 70% 1m" [ref=e208] [cursor=pointer]:
+                  - cell [ref=e209]:
+                    - img [ref=e210]
+                  - cell "2:27 PM" [ref=e212]
+                  - cell "Window" [ref=e213]:
+                    - generic [ref=e214]:
+                      - img [ref=e215]
+                      - text: Window
+                  - cell "Visual Studio Code" [ref=e217]
+                  - cell "development/coding" [ref=e218]:
+                    - generic [ref=e219]: development/coding
+                  - cell "70%" [ref=e220]:
+                    - generic [ref=e222]: 70%
+                  - cell "1m" [ref=e223]
+                - row "2:27 PM Claude have you fixes tracking activities across all sources for the llm classification training? development/bugs 85% 0m" [ref=e224] [cursor=pointer]:
+                  - cell [ref=e225]:
+                    - img [ref=e226]
+                  - cell "2:27 PM" [ref=e228]
+                  - cell "Claude" [ref=e229]:
+                    - generic [ref=e230]: Claude
+                  - cell "have you fixes tracking activities across all sources for the llm classification training?" [ref=e231]
+                  - cell "development/bugs" [ref=e232]:
+                    - generic [ref=e233]: development/bugs
+                  - cell "85%" [ref=e234]:
+                    - generic [ref=e236]: 85%
+                  - cell "0m" [ref=e237]
+                - row "2:28 PM Window Visual Studio Code development/coding 70% 1m" [ref=e238] [cursor=pointer]:
+                  - cell [ref=e239]:
+                    - img [ref=e240]
+                  - cell "2:28 PM" [ref=e242]
+                  - cell "Window" [ref=e243]:
+                    - generic [ref=e244]:
+                      - img [ref=e245]
+                      - text: Window
+                  - cell "Visual Studio Code" [ref=e247]
+                  - cell "development/coding" [ref=e248]:
+                    - generic [ref=e249]: development/coding
+                  - cell "70%" [ref=e250]:
+                    - generic [ref=e252]: 70%
+                  - cell "1m" [ref=e253]
+                - row "2:28 PM Claude extend it to cover all sources using polymorphic source + source_id development/architecture 85% 5m" [ref=e254] [cursor=pointer]:
+                  - cell [ref=e255]:
+                    - img [ref=e256]
+                  - cell "2:28 PM" [ref=e258]
+                  - cell "Claude" [ref=e259]:
+                    - generic [ref=e260]: Claude
+                  - cell "extend it to cover all sources using polymorphic source + source_id" [ref=e261]
+                  - cell "development/architecture" [ref=e262]:
+                    - generic [ref=e263]: development/architecture
+                  - cell "85%" [ref=e264]:
+                    - generic [ref=e266]: 85%
+                  - cell "5m" [ref=e267]
+                - row "2:29 PM Window Visual Studio Code development/coding 70% 1m" [ref=e268] [cursor=pointer]:
+                  - cell [ref=e269]:
+                    - img [ref=e270]
+                  - cell "2:29 PM" [ref=e272]
+                  - cell "Window" [ref=e273]:
+                    - generic [ref=e274]:
+                      - img [ref=e275]
+                      - text: Window
+                  - cell "Visual Studio Code" [ref=e277]
+                  - cell "development/coding" [ref=e278]:
+                    - generic [ref=e279]: development/coding
+                  - cell "70%" [ref=e280]:
+                    - generic [ref=e282]: 70%
+                  - cell "1m" [ref=e283]
+                - row "2:30 PM Window Visual Studio Code development/coding 70% 1m" [ref=e284] [cursor=pointer]:
+                  - cell [ref=e285]:
+                    - img [ref=e286]
+                  - cell "2:30 PM" [ref=e288]
+                  - cell "Window" [ref=e289]:
+                    - generic [ref=e290]:
+                      - img [ref=e291]
+                      - text: Window
+                  - cell "Visual Studio Code" [ref=e293]
+                  - cell "development/coding" [ref=e294]:
+                    - generic [ref=e295]: development/coding
+                  - cell "70%" [ref=e296]:
+                    - generic [ref=e298]: 70%
+                  - cell "1m" [ref=e299]
+                - row "2:35 PM Claude /cto-advisor and cpo-advisor - I'd like to design a feature that tests pm pulse through the user interafce things like feautres, usability, accessbility, workflow understanding, and identify gaps and requirements/technical 85% 0m" [ref=e300] [cursor=pointer]:
+                  - cell [ref=e301]:
+                    - img [ref=e302]
+                  - cell "2:35 PM" [ref=e304]
+                  - cell "Claude" [ref=e305]:
+                    - generic [ref=e306]: Claude
+                  - cell "/cto-advisor and cpo-advisor - I'd like to design a feature that tests pm pulse through the user interafce things like feautres, usability, accessbility, workflow understanding, and identify gaps and" [ref=e307]
+                  - cell "requirements/technical" [ref=e308]:
+                    - generic [ref=e309]: requirements/technical
+                  - cell "85%" [ref=e310]:
+                    - generic [ref=e312]: 85%
+                  - cell "0m" [ref=e313]
+                - row "2:52 PM Window Microsoft Teams communication/meetings 60% 1m" [ref=e314] [cursor=pointer]:
+                  - cell [ref=e315]:
+                    - img [ref=e316]
+                  - cell "2:52 PM" [ref=e318]
+                  - cell "Window" [ref=e319]:
+                    - generic [ref=e320]:
+                      - img [ref=e321]
+                      - text: Window
+                  - cell "Microsoft Teams" [ref=e323]
+                  - cell "communication/meetings" [ref=e324]:
+                    - generic [ref=e325]: communication/meetings
+                  - cell "60%" [ref=e326]:
+                    - generic [ref=e328]: 60%
+                  - cell "1m" [ref=e329]
+                - row "2:55 PM Window Microsoft Teams communication/meetings 60% 1m" [ref=e330] [cursor=pointer]:
+                  - cell [ref=e331]:
+                    - img [ref=e332]
+                  - cell "2:55 PM" [ref=e334]
+                  - cell "Window" [ref=e335]:
+                    - generic [ref=e336]:
+                      - img [ref=e337]
+                      - text: Window
+                  - cell "Microsoft Teams" [ref=e339]
+                  - cell "communication/meetings" [ref=e340]:
+                    - generic [ref=e341]: communication/meetings
+                  - cell "60%" [ref=e342]:
+                    - generic [ref=e344]: 60%
+                  - cell "1m" [ref=e345]
+            - paragraph [ref=e346]: Showing latest 10 of 78
+        - paragraph [ref=e347]: ← → navigate dates · T jump to today · Esc close panel
+      - complementary
+  - button "Open Next.js Dev Tools" [ref=e353] [cursor=pointer]:
+    - img [ref=e354]
+  - alert [ref=e357]
+```
