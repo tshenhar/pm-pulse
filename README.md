@@ -35,14 +35,13 @@ PMs who:
 
 ## Key features
 
-- **Automatic Claude Code tracking** - hooks into on-prompt and on-stop events to measure exact response time and classify prompt content
-- **Multi-source activity merge** - Claude prompts, browser tabs, app windows, and calendar events combined into a single daily timeline
-- **Explainable classifications** - every activity shows its category, confidence score, and the reasoning behind the classification
-- **Manual override with audit trail** - disagree with a classification? Override it; the original is preserved
-- **Daily dashboard** - summary cards, category donut chart, source breakdown, and activity table with expandable detail sidebar
-- **Trends** - weekly and monthly views across all categories
-- **Privacy controls** - store full prompt text, preview only, or redact entirely
-- **CSV export** - one-click export of any day's data
+- **Prompt-level intelligence** - captures what you actually asked Claude, not just "app open: X min." Every prompt is classified, reasoned about, and timed.
+- **Exact response-time measurement** - a Stop hook fires when Claude finishes responding, measuring the precise duration of every AI interaction.
+- **Explainable classifications** - every activity shows its PM category, confidence score, and the reasoning behind the call. Nothing is a black box.
+- **PM work taxonomy** - 7 categories built around how PMs actually work: Strategy, Requirements, Communication, Writing, Analytics, Development, Productivity.
+- **Multi-source timeline** - Claude prompts, browser tabs, app windows, and calendar events merged into a single daily view. Gaps between prompts are explainable using other source data.
+- **100% local** - all data at `~/.pm-pulse/`. Works with confidential roadmaps, unreleased features, internal strategy. Nothing leaves your machine.
+- **Override with audit trail** - correct any misclassification; the original is preserved with timestamp and reason.
 
 ---
 
