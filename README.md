@@ -2,7 +2,7 @@
 
 **A local-first productivity tracker built for PMs doing AI-native work.**
 
-Most PMs have no honest answer to "how did you spend your time this week?" Calendar blocks don't capture deep work. Manual timers don't survive contact with reality. And generic trackers like Toggl or Rize see "Claude Code: 3 hours" as a single opaque chunk - they have no idea you were writing a PRD, reviewing architecture, and debugging a spec all in the same session.
+Most PMs have no honest answer to "how did you spend your time this week?" Calendar blocks don't capture deep work. Manual timers don't survive contact with reality. And generic trackers see "Claude Code: 3 hours" as a single opaque chunk - they have no idea you were writing a PRD, reviewing architecture, and debugging a spec all in the same session.
 
 PM Pulse passively observes what you're actually doing - your Claude Code prompts, browser research, app usage, and calendar events - classifies each into a PM-specific work taxonomy, and gives you an honest breakdown of where your time actually went.
 
@@ -20,20 +20,6 @@ PMs who:
 
 ---
 
-## Key features
-
-- **Automatic Claude Code tracking** - hooks into on-prompt and on-stop events to measure exact response time and classify prompt content
-- **Multi-source activity merge** - Claude prompts, browser tabs, app windows, and calendar events combined into a single daily timeline
-- **Explainable classifications** - every activity shows its category, confidence score, and the reasoning behind the classification
-- **Manual override with audit trail** - disagree with a classification? Override it; the original is preserved
-- **Daily dashboard** - summary cards, category donut chart, source breakdown, activity table with expandable detail sidebar
-- **Trends** - weekly and monthly views across all categories
-- **Privacy controls** - store full prompt text, preview only, or redact entirely
-- **Keyboard navigation** - arrow keys for date navigation, T for today, Esc to close panels
-- **CSV export** - one-click export of any day's data
-
----
-
 ## What makes it different
 
 | | PM Pulse | Other time trackers |
@@ -47,16 +33,22 @@ PMs who:
 
 ---
 
+## Key features
+
+- **Automatic Claude Code tracking** - hooks into on-prompt and on-stop events to measure exact response time and classify prompt content
+- **Multi-source activity merge** - Claude prompts, browser tabs, app windows, and calendar events combined into a single daily timeline
+- **Explainable classifications** - every activity shows its category, confidence score, and the reasoning behind the classification
+- **Manual override with audit trail** - disagree with a classification? Override it; the original is preserved
+- **Daily dashboard** - summary cards, category donut chart, source breakdown, and activity table with expandable detail sidebar
+- **Trends** - weekly and monthly views across all categories
+- **Privacy controls** - store full prompt text, preview only, or redact entirely
+- **CSV export** - one-click export of any day's data
+
+---
+
 ## How it works
 
-PM Pulse captures activity from 4 sources and classifies each into a PM work taxonomy:
-
-```
-Claude Code hooks   --.
-Browser tracker     --+--> classify --> attribute time --> SQLite --> dashboard
-Window watcher      --'
-Calendar (ICS)      --'
-```
+PM Pulse captures activity from 4 sources, classifies each into a PM work taxonomy, attributes time, and stores everything locally in SQLite:
 
 1. **Claude Code hooks** fire on every prompt and session event, capturing what you're working on and for how long
 2. **Browser tracker** reads your Chromium history (locally, read-only) and classifies sites by domain
@@ -79,15 +71,15 @@ Everything is classified into one of 7 PM work categories:
 
 ## Platform requirements
 
+> **macOS is required** for window tracking and browser history access. The dashboard and Claude Code hooks work cross-platform, but the background daemons (window + browser trackers) are macOS-only.
+
 | Requirement | Detail |
 |-------------|--------|
-| OS | macOS (required for window tracking and browser history access) |
+| OS | macOS (for full tracking); Linux/Windows supported for dashboard + Claude hooks only |
 | Node.js | v18+ |
-| Browser tracking | Chrome, Arc, Edge (Chromium-based only; Safari not supported) |
+| Browser tracking | Chrome, Arc, Edge (Chromium-based only - Safari not supported) |
 | Claude Code | Required for prompt tracking; hooks registered via `npm run setup` |
-| Disk | ~50MB for app + SQLite grows with usage (~1MB per month typical) |
-
-> **Linux/Windows:** The dashboard and Claude Code hooks work cross-platform. Window tracking and browser tracking daemons are macOS-only (they use `lsappinfo` and Chromium SQLite history).
+| Disk | ~50MB for app; SQLite grows with usage (~1MB/month typical) |
 
 ---
 
@@ -124,7 +116,7 @@ npm run watch-browser   # browser tab tracker
 npm run watch-windows   # macOS app/window tracker
 ```
 
-These run as background daemons. Add them to your startup items or use the provided launchd script:
+These run as background daemons. To have them start automatically on login:
 
 ```bash
 node scripts/install-launch-agent.mjs
@@ -148,7 +140,7 @@ All data lives at `~/.pm-pulse/`:
   window-events/       # Raw window session events (processed and deleted)
 ```
 
-No data ever leaves your machine unless you explicitly use LLM classification mode (which calls an external API you configure).
+No data ever leaves your machine unless you explicitly enable LLM classification mode, which calls an external API you configure.
 
 ---
 
@@ -174,17 +166,9 @@ Settings are managed via the dashboard at `/settings`. Key options:
 
 ---
 
-## Roadmap
+## Contributing
 
-Active development. Phases in progress:
-
-- **Phase 8 (current)** - Time attribution accuracy, Stop hook direct measurement, untracked time surface
-- **Phase 9** - Day timeline visualization, context switch score
-- **Phase 10** - Weekly digest with auto-generated narrative
-- **Phase 11** - Hybrid LLM classification for low-confidence activities
-- **Phase 12** - Initiative/project dimension (classify by *which* project, not just *what type* of work)
-
-See [`reference docs/SPEC.md`](reference%20docs/SPEC.md) for full technical specification and [`reference docs/IDEAS.md`](reference%20docs/IDEAS.md) for the ideas backlog.
+PM Pulse is open source and welcomes contributions. Open an issue to discuss a feature or bug before submitting a PR. See the spec and ideas docs in `reference docs/` for context on where the project is headed.
 
 ---
 
