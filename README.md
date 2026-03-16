@@ -20,15 +20,29 @@ PMs who:
 
 ---
 
+## Key features
+
+- **Automatic Claude Code tracking** - hooks into on-prompt and on-stop events to measure exact response time and classify prompt content
+- **Multi-source activity merge** - Claude prompts, browser tabs, app windows, and calendar events combined into a single daily timeline
+- **Explainable classifications** - every activity shows its category, confidence score, and the reasoning behind the classification
+- **Manual override with audit trail** - disagree with a classification? Override it; the original is preserved
+- **Daily dashboard** - summary cards, category donut chart, source breakdown, activity table with expandable detail sidebar
+- **Trends** - weekly and monthly views across all categories
+- **Privacy controls** - store full prompt text, preview only, or redact entirely
+- **Keyboard navigation** - arrow keys for date navigation, T for today, Esc to close panels
+- **CSV export** - one-click export of any day's data
+
+---
+
 ## What makes it different
 
-| | PM Pulse | Rize / Toggl / generic trackers |
+| | PM Pulse | Other time trackers |
 |---|---|---|
 | Understands Claude prompts | Yes - captures what you actually asked | No - just "app open: X min" |
 | PM-specific taxonomy | 7 categories mapped to PM work | Generic project/client tags |
 | Explainable classifications | Reasoning + confidence per activity | Black box |
 | Data privacy | 100% local, never leaves your machine | Cloud-stored |
-| Cost | Free | $10-20/mo |
+| Cost | Free | Typically $10-20/mo |
 | Works with confidential work | Yes | Risk of sensitive data in cloud |
 
 ---
@@ -60,20 +74,6 @@ Everything is classified into one of 7 PM work categories:
 | Analytics & Experimentation | Data analysis, reporting, A/B tests |
 | Development & Technical | Coding, architecture, tooling, debugging |
 | Personal Productivity | Learning, admin, meta-work |
-
----
-
-## Key features
-
-- **Automatic Claude Code tracking** - hooks into on-prompt and on-stop events to measure exact response time and classify prompt content
-- **Multi-source activity merge** - Claude prompts, browser tabs, app windows, and calendar events combined into a single daily timeline
-- **Explainable classifications** - every activity shows its category, confidence score, and the reasoning behind the classification
-- **Manual override with audit trail** - disagree with a classification? Override it; the original is preserved
-- **Daily dashboard** - summary cards, category donut chart, source breakdown, activity table with expandable detail sidebar
-- **Trends** - weekly and monthly views across all categories
-- **Privacy controls** - store full prompt text, preview only, or redact entirely
-- **Keyboard navigation** - arrow keys for date navigation, T for today, Esc to close panels
-- **CSV export** - one-click export of any day's data
 
 ---
 
