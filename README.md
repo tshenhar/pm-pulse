@@ -10,6 +10,16 @@ All data stays on your machine. No accounts. No cloud. No subscriptions.
 
 ---
 
+## Screenshots
+
+![PM Pulse Dashboard](docs/screenshots/dashboard.png)
+*Daily dashboard - summary cards, category breakdown, source breakdown, and activity log*
+
+![Activity Detail Sidebar](docs/screenshots/activity-detail.png)
+*Activity detail sidebar - full prompt, classification with reasoning, confidence score, and reclassify UI*
+
+---
+
 ## Who it's for
 
 PMs who:
