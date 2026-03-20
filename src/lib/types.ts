@@ -226,6 +226,8 @@ export interface ActivitySummary {
   attendee_count?: number;
   location?: string | null;
   end_time?: string;
+  // window-specific
+  window_title?: string | null;
   // shared
   classification_reasoning?: string | null;
 }
@@ -263,6 +265,23 @@ export interface SourceBreakdown {
   browser_minutes: number;
 }
 
+export interface FocusSessions {
+  deep_minutes: number;
+  light_minutes: number;
+  deep_count: number;
+  light_count: number;
+  longest_app: string | null;
+  longest_minutes: number;
+}
+
+export interface FocusScoreResult {
+  score: number;
+  transitions: number;
+  costly_transitions: { from: string; to: string; time: string }[];
+  longest_block_minutes: number;
+  longest_block_category: string | null;
+}
+
 export interface DashboardData {
   date: string;
   total_hours: number;
@@ -280,6 +299,15 @@ export interface DashboardData {
   activities: ActivitySummary[];
   yesterday?: YesterdayTotals;
   auto_refresh: boolean;
+  needs_refresh?: boolean;
+  day_start_iso?: string;
+  focus_sessions?: FocusSessions;
+  productivity_score?: ScoreBreakdown | null;
+  anomaly_alerts?: AnomalyAlert[];
+  parallel_work_detected?: boolean;
+  parallel_minutes?: number;
+  parallel_sessions?: number;
+  initiative_breakdown?: { initiative: string; name: string; color: string; minutes: number }[];
 }
 
 export interface CategoryBreakdown {
@@ -348,6 +376,58 @@ export interface TrainingItem {
   prompt_text?: string | null;
 }
 
+// === Initiative types ===
+
+export interface Initiative {
+  id: number;
+  name: string;
+  slug: string;
+  keywords: string[];
+  color: string;
+  is_active: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// === Productivity Score types ===
+
+export interface ScoreBreakdown {
+  score: number;
+  strategic_pct: number;
+  focus_minutes: number;
+  reactive_pct: number;
+  label: "Focus Day" | "Reactive Day" | "Mixed" | "Insufficient data";
+}
+
+// === Insights types ===
+
+export interface AnomalyAlert {
+  type: string;
+  message: string;
+  severity: "info" | "warning";
+  metric: string;
+  value: number;
+  baseline: number;
+  z_score: number;
+}
+
+export interface HourlyHeatmapCell {
+  hour: number;
+  day_of_week: number;
+  minutes: number;
+  dominant_category: string | null;
+}
+
+export interface RoleTargets {
+  strategy?: number;
+  requirements?: number;
+  communication?: number;
+  writing?: number;
+  analytics?: number;
+  development?: number;
+  productivity?: number;
+}
+
 // === Settings ===
 
 export type PrivacyMode = "full" | "preview" | "redacted";
@@ -371,6 +451,46 @@ export interface AppSettings {
   dashboard_col_count: number;
   settings_card_order: string[];
   settings_col_count: number;
+  role_targets: RoleTargets;
+  anomaly_alerts_enabled: boolean;
+}
+
+// === Weekly Digest types ===
+
+export interface DigestCategoryBreakdown {
+  category: string;
+  name: string;
+  color: string;
+  this_week_minutes: number;
+  last_week_minutes: number;
+  delta_minutes: number;
+}
+
+export interface DigestData {
+  this_week: {
+    start: string;
+    end: string;
+    total_hours: number;
+    meeting_hours: number;
+    focus_hours: number;
+    total_events: number;
+  };
+  last_week: {
+    start: string;
+    end: string;
+    total_hours: number;
+    meeting_hours: number;
+    focus_hours: number;
+    total_events: number;
+  };
+  daily_hours: { date: string; hours: number }[];
+  narrative: string[];
+  superlatives: {
+    longest_focus: { date: string; minutes: number; app: string } | null;
+    busiest_meeting_day: { date: string; meetings: number } | null;
+    best_focus_score_day: { date: string; score: number } | null;
+  };
+  category_breakdown: DigestCategoryBreakdown[];
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -391,4 +511,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   dashboard_col_count: 2,
   settings_card_order: ["privacy", "classification", "activity-tracking", "calendar", "window", "browser", "dashboard-settings", "exclusions", "export"],
   settings_col_count: 1,
+  role_targets: {},
+  anomaly_alerts_enabled: true,
 };

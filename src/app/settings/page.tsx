@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Save, Check, Download, RefreshCw, GripVertical, Pencil } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { getCached, setCached, invalidateCache } from "@/lib/client-cache";
+import { ArrowLeft, Save, Check, Download, RefreshCw, GripVertical, Pencil, Trash2 } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import type { AppSettings, ExclusionRule } from "@/lib/types";
+import type { AppSettings, ExclusionRule, Initiative, RoleTargets } from "@/lib/types";
 import {
   DndContext,
   PointerSensor,
@@ -29,9 +30,23 @@ const DEFAULT_CARD_ORDER = [
   "calendar",
   "window",
   "browser",
+  "initiatives",
+  "role-targets",
   "dashboard-settings",
   "exclusions",
   "export",
+];
+
+const INITIATIVE_COLORS = ["#6366f1", "#ec4899", "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6"];
+
+const ROLE_TARGET_CATEGORIES: { slug: keyof RoleTargets; label: string; color: string }[] = [
+  { slug: "strategy", label: "Strategy & Planning", color: "#6366f1" },
+  { slug: "requirements", label: "Requirements", color: "#8b5cf6" },
+  { slug: "communication", label: "Communication", color: "#ec4899" },
+  { slug: "writing", label: "Writing & Docs", color: "#f59e0b" },
+  { slug: "analytics", label: "Analytics", color: "#10b981" },
+  { slug: "development", label: "Development", color: "#3b82f6" },
+  { slug: "productivity", label: "Personal Productivity", color: "#6b7280" },
 ];
 
 function SortableCard({
@@ -51,8 +66,8 @@ function SortableCard({
   };
 
   return (
-    <div ref={setNodeRef} style={style}>
-      <div className={`relative ${isEditMode ? "ring-1 ring-border rounded-xl" : ""}`}>
+    <div ref={setNodeRef} style={style} className="h-full">
+      <div className={`relative h-full ${isEditMode ? "ring-1 ring-border rounded-xl" : ""}`}>
         {isEditMode && (
           <div
             className="absolute top-3 right-3 z-10 flex cursor-grab items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground hover:text-foreground active:cursor-grabbing"
@@ -84,6 +99,10 @@ export default function SettingsPage() {
   const [exclusions, setExclusions] = useState<ExclusionRule[]>([]);
   const [newApp, setNewApp] = useState("");
   const [newDomain, setNewDomain] = useState("");
+  const [initiatives, setInitiatives] = useState<Initiative[]>([]);
+  const [newInitiativeName, setNewInitiativeName] = useState("");
+  const [newInitiativeKeywords, setNewInitiativeKeywords] = useState("");
+  const [newInitiativeColor, setNewInitiativeColor] = useState("#6366f1");
 
   // Layout edit mode
   const [isEditLayoutMode, setIsEditLayoutMode] = useState(false);
@@ -96,20 +115,26 @@ export default function SettingsPage() {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
   useEffect(() => {
-    fetch("/api/settings")
-      .then((r) => r.json())
-      .then((s: AppSettings) => {
-        setSettings(s);
-        const order = Array.isArray(s.settings_card_order) && s.settings_card_order.length > 0
-          ? s.settings_card_order
-          : DEFAULT_CARD_ORDER;
-        setCardOrder(order);
-        savedOrderRef.current = order;
-        const cols = s.settings_col_count ?? 1;
-        setColCount(cols);
-        savedColCountRef.current = cols;
-      })
-      .catch(() => setError("Failed to load settings"));
+    function applySettings(s: AppSettings) {
+      setSettings(s);
+      const order = Array.isArray(s.settings_card_order) && s.settings_card_order.length > 0
+        ? s.settings_card_order
+        : DEFAULT_CARD_ORDER;
+      setCardOrder(order);
+      savedOrderRef.current = order;
+      const cols = s.settings_col_count ?? 1;
+      setColCount(cols);
+      savedColCountRef.current = cols;
+    }
+    const cachedSettings = getCached<AppSettings>("settings");
+    if (cachedSettings) {
+      applySettings(cachedSettings);
+    } else {
+      fetch("/api/settings")
+        .then((r) => r.json())
+        .then((s: AppSettings) => { applySettings(s); setCached("settings", s, 60_000); })
+        .catch(() => setError("Failed to load settings"));
+    }
     fetch("/api/calendar/last-synced")
       .then((r) => r.ok ? r.json() : null)
       .then((d) => d?.synced_at && setCalLastSynced(d.synced_at))
@@ -122,9 +147,18 @@ export default function SettingsPage() {
       .then((r) => r.json())
       .then((d) => setWindowTrackerRunning(d.running))
       .catch(() => setWindowTrackerRunning(false));
-    fetch("/api/exclusions")
+    const cachedExclusions = getCached<ExclusionRule[]>("exclusions");
+    if (cachedExclusions) {
+      setExclusions(cachedExclusions);
+    } else {
+      fetch("/api/exclusions")
+        .then((r) => r.json())
+        .then((d) => { setExclusions(d); setCached("exclusions", d, 60_000); })
+        .catch(() => {});
+    }
+    fetch("/api/initiatives")
       .then((r) => r.json())
-      .then(setExclusions)
+      .then((d) => setInitiatives(d.initiatives || []))
       .catch(() => {});
   }, []);
 
@@ -153,8 +187,10 @@ export default function SettingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ settings_card_order: cardOrder, settings_col_count: colCount }),
       });
+      invalidateCache("settings");
       savedOrderRef.current = cardOrder;
       savedColCountRef.current = colCount;
+      setSettings((s) => s ? { ...s, settings_card_order: cardOrder, settings_col_count: colCount } : s);
       setIsEditLayoutMode(false);
     } finally {
       setIsSavingLayout(false);
@@ -222,9 +258,10 @@ export default function SettingsPage() {
       const res = await fetch("/api/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settings),
+        body: JSON.stringify({ ...settings, settings_card_order: cardOrder, settings_col_count: colCount }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      invalidateCache("settings");
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (e) {
@@ -249,13 +286,44 @@ export default function SettingsPage() {
     });
     if (res.ok) {
       const row = await res.json() as ExclusionRule;
-      setExclusions((prev) => [row, ...prev.filter((e) => !(e.rule_type === rule_type && e.pattern === trimmed))]);
+      setExclusions((prev) => {
+        const next = [row, ...prev.filter((e) => !(e.rule_type === rule_type && e.pattern === trimmed))];
+        setCached("exclusions", next, 60_000);
+        return next;
+      });
     }
   }
 
   async function removeExclusion(rule_type: 'app_name' | 'domain', pattern: string) {
     await fetch(`/api/exclusions?type=${rule_type}&pattern=${encodeURIComponent(pattern)}`, { method: "DELETE" });
-    setExclusions((prev) => prev.filter((e) => !(e.rule_type === rule_type && e.pattern === pattern)));
+    setExclusions((prev) => {
+      const next = prev.filter((e) => !(e.rule_type === rule_type && e.pattern === pattern));
+      setCached("exclusions", next, 60_000);
+      return next;
+    });
+  }
+
+  async function addInitiative() {
+    const name = newInitiativeName.trim();
+    if (!name) return;
+    const keywords = newInitiativeKeywords.split(",").map((k) => k.trim()).filter(Boolean);
+    const res = await fetch("/api/initiatives", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, keywords, color: newInitiativeColor }),
+    });
+    if (res.ok) {
+      const d = await res.json();
+      setInitiatives((prev) => [...prev, d.initiative]);
+      setNewInitiativeName("");
+      setNewInitiativeKeywords("");
+      setNewInitiativeColor("#6366f1");
+    }
+  }
+
+  async function deleteInitiative(id: number) {
+    await fetch(`/api/initiatives/${id}`, { method: "DELETE" });
+    setInitiatives((prev) => prev.filter((i) => i.id !== id));
   }
 
   function renderCard(id: string) {
@@ -380,16 +448,16 @@ export default function SettingsPage() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Block keyword</label>
+                <label className="text-sm font-medium">Block keywords</label>
                 <input
                   type="text"
                   className="w-full h-9 rounded-md border bg-background px-3 text-sm font-mono"
-                  placeholder="e.g. BLOCK"
+                  placeholder="e.g. BLOCK, OOO, Focus"
                   value={settings.calendar_block_keyword}
                   onChange={(e) => update("calendar_block_keyword", e.target.value)}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Calendar events containing this keyword are treated as focus blocks, not meetings.
+                  Comma-separated keywords. Calendar events matching any keyword are treated as focus blocks, not meetings.
                 </p>
               </div>
               {settings.calendar_ics_url && (
@@ -674,6 +742,147 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         );
+      case "initiatives":
+        return (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-1.5">
+                <CardTitle>Initiatives</CardTitle>
+                <InfoTooltip text="Define project names and keywords to track time by initiative. PM Pulse will automatically tag activities matching these keywords." />
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Track time across active projects and initiatives.
+              </p>
+              {initiatives.length > 0 && (
+                <div className="space-y-2">
+                  {initiatives.map((initiative) => (
+                    <div key={initiative.id} className="flex items-center gap-2 rounded-lg border px-3 py-2">
+                      <span
+                        className="size-3 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: initiative.color }}
+                      />
+                      <span className="text-sm font-medium flex-1">{initiative.name}</span>
+                      {initiative.keywords.length > 0 && (
+                        <span className="text-xs text-muted-foreground truncate max-w-[200px]">
+                          {initiative.keywords.join(", ")}
+                        </span>
+                      )}
+                      <button
+                        onClick={() => deleteInitiative(initiative.id)}
+                        className="text-muted-foreground hover:text-destructive transition-colors flex-shrink-0"
+                        aria-label={`Delete ${initiative.name}`}
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="space-y-2 rounded-lg border p-3">
+                <p className="text-xs font-medium text-muted-foreground">Add initiative</p>
+                <input
+                  type="text"
+                  className="w-full h-8 rounded-md border bg-background px-3 text-sm"
+                  placeholder="Initiative name (e.g. Q2 Launch)"
+                  value={newInitiativeName}
+                  onChange={(e) => setNewInitiativeName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") addInitiative(); }}
+                />
+                <input
+                  type="text"
+                  className="w-full h-8 rounded-md border bg-background px-3 text-sm"
+                  placeholder="Keywords, comma-separated (e.g. launch, release)"
+                  value={newInitiativeKeywords}
+                  onChange={(e) => setNewInitiativeKeywords(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") addInitiative(); }}
+                />
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    {INITIATIVE_COLORS.map((color) => (
+                      <button
+                        key={color}
+                        onClick={() => setNewInitiativeColor(color)}
+                        className={`size-5 rounded-full transition-transform ${newInitiativeColor === color ? "ring-2 ring-offset-1 ring-foreground scale-110" : ""}`}
+                        style={{ backgroundColor: color }}
+                        aria-label={`Select color ${color}`}
+                      />
+                    ))}
+                  </div>
+                  <Button size="sm" variant="outline" onClick={addInitiative} disabled={!newInitiativeName.trim()}>
+                    Add
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      case "role-targets": {
+        const targets = settings.role_targets ?? {};
+        const total = ROLE_TARGET_CATEGORIES.reduce((sum, c) => sum + (targets[c.slug] ?? 0), 0);
+        return (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-1.5">
+                <CardTitle>PM Role Targets</CardTitle>
+                <InfoTooltip text="Set target time allocations per category. Your actual vs. target split is shown in the Trends page." />
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Define how you ideally want to allocate your PM time.
+              </p>
+              <div className="space-y-2">
+                {ROLE_TARGET_CATEGORIES.map((cat) => (
+                  <div key={cat.slug} className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-2 flex-1">
+                      <span className="size-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />
+                      <p className="text-sm">{cat.label}</p>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-muted-foreground">Target %</span>
+                      <input
+                        type="number"
+                        value={targets[cat.slug] ?? 0}
+                        onChange={(e) => {
+                          const v = parseInt(e.target.value, 10);
+                          if (!isNaN(v) && v >= 0 && v <= 100) {
+                            update("role_targets", { ...targets, [cat.slug]: v });
+                          }
+                        }}
+                        min={0}
+                        max={100}
+                        step={5}
+                        className="h-8 w-16 rounded-md border bg-background px-2 text-sm text-right tabular-nums"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-1.5 h-3 rounded-full overflow-hidden">
+                  {ROLE_TARGET_CATEGORIES.map((cat) => {
+                    const pct = targets[cat.slug] ?? 0;
+                    if (pct === 0) return null;
+                    return (
+                      <div
+                        key={cat.slug}
+                        title={`${cat.label}: ${pct}%`}
+                        className="h-full rounded-full"
+                        style={{ backgroundColor: cat.color, width: `${pct}%` }}
+                      />
+                    );
+                  })}
+                </div>
+                <p className={`text-xs ${total !== 100 ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`}>
+                  Total: {total}%{total !== 100 ? " — targets should add up to 100%" : ""}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      }
       default:
         return null;
     }
@@ -750,11 +959,14 @@ export default function SettingsPage() {
                 className="grid gap-6"
                 style={{ gridTemplateColumns: `repeat(${colCount}, minmax(0, 1fr))` }}
               >
-                {cardOrder.map((id) => (
-                  <SortableCard key={id} id={id} isEditMode={isEditLayoutMode}>
-                    {renderCard(id)}
-                  </SortableCard>
-                ))}
+                {cardOrder.map((id) => {
+                  const card = renderCard(id);
+                  return (
+                    <SortableCard key={id} id={id} isEditMode={isEditLayoutMode}>
+                      {card ? React.cloneElement(card, { className: `h-full ${card.props.className ?? ""}`.trim() }) : null}
+                    </SortableCard>
+                  );
+                })}
               </div>
             </SortableContext>
           </DndContext>

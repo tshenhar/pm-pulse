@@ -28,7 +28,9 @@ interface TrendsData {
   daily_by_category: Record<string, number | string>[];
   total_hours: number;
   total_prompts: number;
+  total_events: number;
   avg_hours_per_day: number;
+  work_pattern_insights: string[];
 }
 
 export async function GET(request: Request): Promise<NextResponse<TrendsData | { error: string }>> {
@@ -64,6 +66,18 @@ export async function GET(request: Request): Promise<NextResponse<TrendsData | {
         "SELECT * FROM prompts WHERE timestamp BETWEEN ? AND ? ORDER BY timestamp ASC"
       )
       .all(startOfRange, endOfRange) as PromptRow[];
+
+    const calendarEvents = db
+      .prepare("SELECT start_time, duration_minutes, primary_category FROM calendar_events WHERE start_time BETWEEN ? AND ?")
+      .all(startOfRange, endOfRange) as { start_time: string; duration_minutes: number; primary_category: string }[];
+
+    const windowEvents = db
+      .prepare("SELECT start_time, duration_minutes, primary_category FROM window_events WHERE start_time BETWEEN ? AND ?")
+      .all(startOfRange, endOfRange) as { start_time: string; duration_minutes: number; primary_category: string }[];
+
+    const browserEvents = db
+      .prepare("SELECT start_time, duration_minutes, primary_category FROM browser_events WHERE start_time BETWEEN ? AND ?")
+      .all(startOfRange, endOfRange) as { start_time: string; duration_minutes: number; primary_category: string }[];
 
     const categories = db
       .prepare("SELECT slug, name, color FROM categories")
@@ -104,6 +118,29 @@ export async function GET(request: Request): Promise<NextResponse<TrendsData | {
       }
     }
 
+    // Add calendar, window, and browser events to daily and category totals
+    const otherEvents = [
+      ...calendarEvents.map((e) => ({ date: e.start_time.split("T")[0], minutes: e.duration_minutes, category: e.primary_category })),
+      ...windowEvents.map((e) => ({ date: e.start_time.split("T")[0], minutes: e.duration_minutes, category: e.primary_category })),
+      ...browserEvents.map((e) => ({ date: e.start_time.split("T")[0], minutes: e.duration_minutes, category: e.primary_category })),
+    ];
+
+    for (const e of otherEvents) {
+      const daily = dailyMap.get(e.date);
+      if (daily) {
+        daily.minutes += e.minutes;
+      }
+
+      if (e.category) {
+        catTotalMap.set(e.category, (catTotalMap.get(e.category) || 0) + e.minutes);
+
+        const dayCat = dailyCatMap.get(e.date);
+        if (dayCat) {
+          dayCat.set(e.category, (dayCat.get(e.category) || 0) + e.minutes);
+        }
+      }
+    }
+
     const daily_totals: DailyTotal[] = Array.from(dailyMap.entries()).map(
       ([date, data]) => ({
         date,
@@ -129,8 +166,35 @@ export async function GET(request: Request): Promise<NextResponse<TrendsData | {
       }
     );
 
-    const totalMinutes = prompts.reduce((s, p) => s + p.attributed_minutes, 0);
-    const activeDays = daily_totals.filter((d) => d.prompts > 0).length;
+    const totalMinutes = Array.from(dailyMap.values()).reduce((s, d) => s + d.minutes, 0);
+    const activeDays = daily_totals.filter((d) => d.hours > 0).length;
+    const total_events = prompts.length + calendarEvents.length + windowEvents.length + browserEvents.length;
+
+    // Compute work pattern insights
+    const totalCatMinutes = Array.from(catTotalMap.values()).reduce((s, m) => s + m, 0);
+    const work_pattern_insights: string[] = [];
+
+    if (totalCatMinutes > 0) {
+      const commMinutes = catTotalMap.get("communication") || 0;
+      const commPct = Math.round((commMinutes / totalCatMinutes) * 100);
+      if (commPct > 40) {
+        work_pattern_insights.push(`High communication week - ${commPct}% of tracked time in meetings and stakeholder work`);
+      }
+
+      const stratMinutes = catTotalMap.get("strategy") || 0;
+      const reqMinutes = catTotalMap.get("requirements") || 0;
+      const stratReqPct = Math.round(((stratMinutes + reqMinutes) / totalCatMinutes) * 100);
+      if (stratMinutes + reqMinutes > 0 && stratReqPct > 50) {
+        work_pattern_insights.push(`Strong strategic focus - ${stratReqPct}% in high-leverage work (strategy + requirements)`);
+      } else if (stratReqPct < 15 && totalMinutes > 120) {
+        work_pattern_insights.push(`Low strategic work this period - only ${stratReqPct}% in strategy and requirements`);
+      }
+    }
+
+    const totalHours = Math.round((totalMinutes / 60) * 100) / 100;
+    if (totalHours > 40) {
+      work_pattern_insights.push(`Productive period - ${totalHours}h tracked across ${activeDays} days`);
+    }
 
     return NextResponse.json({
       period: period as "week" | "month",
@@ -139,12 +203,14 @@ export async function GET(request: Request): Promise<NextResponse<TrendsData | {
       daily_totals,
       category_totals,
       daily_by_category,
-      total_hours: Math.round((totalMinutes / 60) * 100) / 100,
+      total_hours: totalHours,
       total_prompts: prompts.length,
+      total_events,
       avg_hours_per_day:
         activeDays > 0
           ? Math.round((totalMinutes / 60 / activeDays) * 100) / 100
           : 0,
+      work_pattern_insights,
     });
   } catch (err) {
     console.error("Trends API error:", err);

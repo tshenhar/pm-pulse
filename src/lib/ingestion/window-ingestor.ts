@@ -76,7 +76,8 @@ function classifyWindow(appName: string, windowTitle?: string): WindowClassifica
     return { category: "analytics", subcategory: "data", confidence: 0.7, reasoning: `spreadsheet: ${appName}` };
   }
   if (/slack|microsoft teams|^teams$|msteams/.test(app)) {
-    return { category: "communication", subcategory: "meetings", confidence: 0.6, reasoning: `messaging: ${appName}` };
+    const detail = windowTitle ? `messaging: ${appName} - ${windowTitle}` : `messaging: ${appName}`;
+    return { category: "communication", subcategory: "meetings", confidence: 0.6, reasoning: detail };
   }
   if (/zoom\.us|^zoom$/.test(app)) {
     return { category: "communication", subcategory: "meetings", confidence: 0.75, reasoning: `video meeting: ${appName}` };
@@ -102,7 +103,8 @@ function classifyWindow(appName: string, windowTitle?: string): WindowClassifica
     return { category: "development", subcategory: "coding", confidence: 0.7, reasoning: `editor: ${appName}` };
   }
   if (/outlook|apple mail/.test(app)) {
-    return { category: "communication", subcategory: "stakeholder", confidence: 0.6, reasoning: `email: ${appName}` };
+    const detail = windowTitle ? `email: ${appName} - ${windowTitle}` : `email: ${appName}`;
+    return { category: "communication", subcategory: "stakeholder", confidence: 0.6, reasoning: detail };
   }
   if (/chrome|safari|firefox|arc|edge/.test(app)) {
     // Title heuristics

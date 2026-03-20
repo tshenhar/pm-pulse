@@ -200,3 +200,24 @@ CREATE TABLE IF NOT EXISTS training_examples (
   created_at TEXT DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_training_examples_active ON training_examples(active);
+
+CREATE TABLE IF NOT EXISTS initiatives (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  slug TEXT UNIQUE NOT NULL,
+  keywords TEXT NOT NULL DEFAULT '[]',
+  color TEXT NOT NULL DEFAULT '#6366f1',
+  is_active INTEGER DEFAULT 1,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS daily_scores (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  date TEXT UNIQUE NOT NULL,
+  score REAL NOT NULL,
+  strategic_score REAL NOT NULL,
+  focus_score REAL NOT NULL,
+  reactive_score REAL NOT NULL,
+  computed_at TEXT DEFAULT (datetime('now'))
+);

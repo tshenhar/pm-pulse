@@ -4,7 +4,7 @@ import { join, resolve } from "path";
 import { homedir } from "os";
 import { NextResponse } from "next/server";
 
-const PID_FILE = join(homedir(), ".pm-pulse", "window-tracker.pid");
+const PID_FILE = join(homedir(), ".pm-pulse", "window-watcher.pid");
 const LOG_FILE = join(homedir(), ".pm-pulse", "window-tracker.log");
 const HOOK_PATH = resolve(process.cwd(), "hooks/window-watcher.mjs");
 

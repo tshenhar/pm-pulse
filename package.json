@@ -15,7 +15,9 @@
     "test": "vitest run",
     "test:browser": "playwright test",
     "test:browser:ui": "playwright test --ui",
-    "test:browser:report": "playwright show-report"
+    "test:browser:report": "playwright show-report",
+    "report": "node scripts/report.mjs",
+    "break-reminder": "node hooks/break-reminder.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",

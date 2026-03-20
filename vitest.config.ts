@@ -11,9 +11,7 @@ export default defineConfig({
     ],
     // SQLite test DB is shared across all files — run files sequentially to prevent state contamination
     pool: "forks",
-    poolOptions: {
-      forks: { singleFork: true },
-    },
+    sequence: { concurrent: false },
   },
   resolve: {
     alias: {

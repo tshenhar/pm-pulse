@@ -14,41 +14,18 @@ Evaluated across four dimensions:
 
 ---
 
-### ★★★ Tier 1 — Build These
+### ★★★ Tier 1 — All shipped
 
-**1. Inter-Prompt Gap Inference (Phase 8d)**
-*Score: Usability ●●● · Delight ●●● · Uniqueness ●●● · Habit ●●*
-
-The single most trust-building feature in the product. Right now, every Claude prompt gap is a black hole — you see "42 min" and have no idea if that's real work or a coffee break. Gap inference opens that black box: "Between prompts: 20m Google Docs · 15m Figma · 10m Slack." This solves the #1 anxiety of any tracking tool — *"why does this number look wrong?"* — and it uses data PM Pulse already has. No other tool can do this because no other tool sees both your Claude prompts AND your app/browser activity simultaneously. Low effort, maximum trust payoff.
-
-**2. Day Timeline / Time Blocks (Phase 9a)**
-*Score: Usability ●●● · Delight ●●● · Uniqueness ●● · Habit ●●*
-
-Humans think spatially about time. The current activity table is a list of disconnected rows — it gives you no mental model of your day. A horizontal color-coded timeline from 8am → now is the most natural way to answer "where did my day go?" The gray gaps (untracked) are especially powerful — they make the invisible visible without any explanation needed. This is a fundamental usability upgrade that makes every other feature easier to understand. Data is already fully available.
-
-**3. Context Switch Score (Phase 9b)**
-*Score: Usability ●● · Delight ●●● · Uniqueness ●●● · Habit ●●●*
-
-The only feature that doesn't just tell you *what* you did but gives you *feedback* on *how* you worked. That's a qualitative leap — it shifts PM Pulse from observation tool to coaching tool. "You switched 5 times between 10–11am — consider batching Slack reviews to the afternoon" is the kind of actionable, PM-specific insight that no calendar or time tracker produces. High habit-formation value because the score creates a game: "can I beat yesterday's 67?" Pairs well with the weekly digest for a "did I improve this week?" ritual.
+Phases 8c (Focus Session Detection), 8d (Inter-Prompt Gap Inference), 9a (Day Timeline), 9b (Context Switch Score/Focus Score), 10a (Weekly Digest), and Daily Pulse are all implemented.
 
 ---
 
 ### ★★ Tier 2 — High Value, Right Timing Matters
 
-**4. Weekly Digest Page (Phase 10a)**
-*Score: Usability ●● · Delight ●●● · Uniqueness ●● · Habit ●●●*
-
-The feature most likely to create a weekly ritual. PMs already do weekly reviews — this becomes their artifact. The auto-generated narrative paragraph ("requirements-heavy week, highest in 4 weeks") is the kind of sentence that makes you feel like the product actually *understands* you, not just counts you. Habit potential is very high. Build after the daily data quality is solid, because weak data makes the narrative feel wrong.
-
-**5. Initiative / Project Dimension (SPEC §13.1)**
+**1. Initiative / Project Dimension (SPEC §13.1)**
 *Score: Usability ●● · Delight ●● · Uniqueness ●●● · Habit ●●*
 
 The strategic moat. Rize can never do this — it has no idea what you're prompting. "I spent 2h on Strategy, of which 1.5h was on the Feature X launch" is the insight PMs actually need for weekly check-ins and roadmap conversations. High effort but durable differentiation. Worth building once the core tracking is stable enough that the initiative classification would be reliable.
-
-**6. Focus Session Detection (Phase 8c)**
-*Score: Usability ●● · Delight ●● · Uniqueness ●● · Habit ●●*
-
-Good, but partially superseded by the Context Switch Score — both answer "did I focus today?" The unique value here is the *named session*: "1h 20m deep focus in Google Docs — PRD writing." That specificity is more trustworthy than a score. Build as a companion to the Context Switch Score, not a replacement.
 
 ---
 
@@ -84,21 +61,6 @@ Four navigation layout options were mocked up. None shipped yet. Pick one when t
 ### Phase 8b — Untracked Time Surface
 Show a coverage bar in the dashboard header: Claude Xh · Meetings Xh · Browser Xh · Apps Xh · **Untracked ~Xh**. Gives an honest "X% of ~8h tracked" signal. Data already exists in `DashboardData` (`tracked_pct`, `expected_minutes`).
 
-### Phase 8c — Focus Session Detection
-Detect sustained single-app windows (15+ min) from `window_events`. Surface as a new summary card: **Deep Focus 1h 45m — 1 deep + 2 light sessions**. Tiers: Deep (30+ min), Light (15–30 min), Fragmented (<15 min). Show sessions list with app, time, category, duration. No new data needed — computed from existing `window_events`.
-
-### Phase 8d — Inter-Prompt Gap Inference
-When a Claude prompt gap > 10 min, query `window_events` + `browser_events` in that window and show a mini timeline inside the detail sidebar: "Between prompts: 20m Google Docs · 15m Figma · 10m Slack." Transforms opaque gaps into explained time. No new data — it's already in the DB.
-
-### Phase 9a — Day Timeline (Time Blocks)
-Horizontal timeline bar from 8am → now, color-coded by category. One row per source (Claude / Meetings / Apps / Browser). Gray gaps = untracked. Click a block to jump to that activity in the table. Recharts or custom SVG. Callout for largest gap: "12:40–1:30pm (50 min untracked) — possible lunch." Data fully available.
-
-### Phase 9b — Context Switch Score / Focus Score
-Replace the "Top Category" summary card with a **Focus Score (0–100)** gauge. Derived from: number of category transitions/hr, average switch distance (7×7 category distance matrix), longest unbroken same-category block. Show weekly sparkline on trends page. Surface costliest transitions: "10:02am Requirements → Communication (High ⚡)". Actionable tip: "Most switching 10–11am — consider batching Slack reviews to the afternoon."
-
-### Phase 10a — Weekly Digest Page
-Dedicated `/digest` page (not just a hook notification). Shows: summary stats (Total Time, Meetings, Focus Sessions, Avg Focus Score) vs. last week. Narrative paragraph auto-generated from templates: "This was a requirements-heavy week — 9.2h on Requirements, your highest in 4 weeks." Category comparison table (this week vs last). Day heatmap (hours per day). Highlights row: Longest Focus Session · Busiest Meeting Day · Best Focus Score · Most Active Claude Day.
-
 ### Phase 12a — Parallel Work Indicator
 When total attributed time > wall-clock hours (multiple Claude sessions overlapping), show a banner: "⚡ Parallel Work Detected — 9.1h attributed across 3 sessions (wall-clock: 6.8h)." Include a session overlap diagram showing which sessions ran simultaneously. Dismiss with "Got it." Prevents user confusion about totals exceeding 8h.
 
@@ -114,3 +76,130 @@ Lower-priority ideas captured here:
 - **Weekly Work Report CLI** — `npm run report` → structured markdown/PDF of the week for sharing or personal reflection.
 - **Linear / Jira enrichment** — fuzzy-match prompt text against open ticket titles, auto-tag with ticket ID, "work by ticket" view. API key in settings, data stays local.
 - **Work pattern insights** — rule-based weekly bullets: "You spent 40% on Communication — highest in a month. Deep work ratio dropped to 1.2h/day." Optional Claude API for narrative quality.
+
+## Window Enrichment - Accessibility APIs (future)
+- Current AppleScript approach for Outlook (main window 1) only returns inbox/folder name - not valuable enough
+- Teams has no AppleScript window support at all (new Electron-based Teams)
+- Real enrichment requires macOS Accessibility APIs (AXUIElement) - would expose meeting titles, email subjects, channel names
+- Deferred until we decide to require Accessibility permissions from users
+
+---
+
+## PM Insights Engine
+
+The shift from "what happened" to "what it means" - turning PM Pulse from an observation tool into a coaching tool.
+
+### Research Foundation
+
+Key findings informing the design:
+
+- **Gloria Mark** - Average attention span is 47 seconds on a screen before switching. After an interruption, it takes ~23 minutes to fully return to a task. Implication: context switches are far more expensive than they feel.
+- **Gonzalez & Mark (Working Spheres)** - People don't work on "tasks" linearly; they juggle multiple "working spheres" (projects/themes) simultaneously, switching between them throughout the day. Implication: category-level tracking is the right unit of analysis, not individual tasks.
+- **Sophie Leroy (Attention Residue)** - When you switch from Task A to Task B, part of your attention remains on Task A. The residue is worse when Task A was incomplete or low in cognitive closure. Implication: not all switches are equal - mid-flow interruptions cost more.
+- **Zaman et al. (Transition Quality)** - Task transitions can be synergistic (related tasks that share context) or antagonistic (unrelated tasks requiring full context reload). Implication: a 7x7 category affinity matrix can score transition cost, not just count transitions.
+- **Das Swain et al. (Focus Time)** - Protected focus blocks (2+ hours uninterrupted) measurably improve output quality and reduce stress. Implication: longest unbroken block is a key health metric.
+- **Daniel Pink / Wieth & Zacks (Chronotype)** - Analytical work is best done during peak alertness (typically morning for most people); creative/divergent work during non-peak hours. Implication: temporal rhythm detection can flag when you're working against your natural patterns.
+- **Shreyas Doshi (LNO Framework)** - PM work divides into Leverage (10x impact), Neutral (expected), and Overhead (necessary but low-value). Tracking the ratio reveals whether you're spending time where it matters most.
+- **Lenny Rachitsky (PM Time Benchmarks)** - Published benchmarks for how top PMs allocate time across strategy, execution, communication. Useful as optional reference points (not prescriptive targets).
+
+### Feature Concepts
+
+#### D. Temporal Rhythm Detector
+
+**Jobs served:** Pattern recognition, behavior change (work with your energy, not against it)
+
+Identifies personal work patterns by time-of-day. "Your Strategy work peaks 9-11am." Flags when working against your rhythm.
+
+**Data:** 14-30 days of timestamped activities from all 4 sources.
+
+**New computation:**
+- Hourly category heatmap: 24 x 7 matrix (hours x categories), minutes per cell
+- Peak detection per category (which hours contain the most of each category)
+- Rhythm match scoring: today's distribution vs 14-day baseline
+- 90-min ultradian block detection (natural work/rest cycles)
+
+**Example outputs:**
+- "Strategy peaks 9-11am (62% of all strategy work). Today you did it at 3pm - historically your lowest-focus period."
+- "Natural rhythm: mornings for Strategy/Requirements, afternoons for Communication/Writing."
+
+**UI:** Section on Weekly Digest page. Hourly heatmap visual (hour x category grid, color intensity = minutes).
+
+**Transforms:** Hourly Heatmap idea (Tier 3, line 112) from "beautiful but low-habit" to actionable coaching by adding rhythm matching.
+
+#### E. PM Role Balance Monitor
+
+**Jobs served:** Pattern recognition, communication ("am I the PM I want to be?")
+
+Tracks category distribution over time against user-configured targets.
+
+**Data:** Multi-week category breakdowns from all sources.
+
+**New computation:**
+- Target allocation model: user sets % targets per category (stored in `settings` table)
+- Variance tracking: actual % vs target %, weekly
+- LNO classification: tag categories as Leverage/Neutral/Overhead, compute ratio
+- Consecutive-week drift detection ("Strategy below target 3 weeks running")
+
+**Example outputs:**
+- "Strategy at 18% this month vs your 30% target. Below target 3 consecutive weeks."
+- "Leverage ratio (Strategy + Requirements + Analytics) hit 41% - first time above 35%."
+
+**UI:** Radar/spider chart on trends page. "PM Role Targets" card in Settings.
+
+#### F. Anomaly & Threshold Alerts
+
+**Jobs served:** Awareness (catch unusual days), behavior change (configurable guardrails)
+
+Detects statistically unusual days using z-scores against 14-day rolling baseline. Plus user-configurable threshold alerts.
+
+**Data:** 14-day rolling window of daily aggregates from existing tables.
+
+**New computation:**
+- Rolling statistics: mean + stddev for ~10 metrics over trailing 14 days
+- Z-score: flag |z| > 1.5 as anomaly
+- Configurable thresholds: "meetings > 50% of day", "focus < 1h", "strategy < 10%"
+
+**Example outputs:**
+- "4.2h in meetings today - 2x your 14-day average. Last time: March 12."
+- "Focus time below 2h/day minimum for 3rd consecutive day."
+
+**UI:** Dismissable banners on dashboard, or highlighted items in Daily Pulse. Threshold config in Settings.
+
+### What's Computable Now vs What's Not
+
+**Would need new data collection (not in scope):**
+- Slack/notification interruption counting
+- Meeting quality/outcomes
+- Collaboration patterns (who you work with)
+- Task completion tracking
+- Cross-person benchmarking (local-first = no population data)
+- Energy/mood correlation (no subjective input mechanism)
+
+### Progressive Disclosure Model
+
+| When | What unlocks | Why |
+|------|-------------|-----|
+| **Day 1** | Daily Pulse with 1-2 descriptive sentences, no comparisons | Build trust in accuracy. User should think "yeah, that's right" |
+| **Week 1** (5 days) | Daily Pulse adds deltas. Context Switch Score appears with 5-day sparkline | Enough baseline for meaningful comparison |
+| **Week 2** (14 days) | Weekly Digest unlocks. Anomaly detection activates (14-day baseline). Temporal Rhythm insights appear | Statistical baselines become reliable |
+| **Month 1** | PM Role Targets available in Settings. Threshold alerts configurable | User understands patterns enough to set meaningful goals |
+| **Quarter 1** | Multi-week trend insights. LNO ratio tracking. Quarterly "Wrapped" summary | Enough runway for meaningful long-term patterns |
+
+### Differentiation (Honest Assessment)
+
+**Only PM Pulse can do:**
+1. PM-specific category insights ("42% Strategy this week" vs generic "4h in Google Docs")
+2. Multi-source transition analysis at PM category level (Claude + browser + window + calendar as unified classified timeline)
+3. Private PM coaching without employer visibility (Viva = org tool, RescueTime Teams = admin-visible)
+4. Claude prompt context as data source (invisible to every other tracker)
+5. Transition quality scoring using PM category affinity (genuine research gap - no published tool does this)
+
+**Cannot do (competitors' strengths):**
+- No mobile tracking, no team analytics, no calendar optimization, macOS-only, no population benchmarks
+
+### Next Build Sequence
+
+1. **Temporal Rhythm Detector** - hourly patterns + rhythm matching
+2. **PM Role Balance Monitor** - target tracking + LNO ratio
+3. **Anomaly & Threshold Alerts** - z-score detection + configurable thresholds
+

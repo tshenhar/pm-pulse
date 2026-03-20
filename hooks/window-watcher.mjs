@@ -14,7 +14,9 @@ import { randomUUID } from "crypto";
 const DATA_DIR = join(homedir(), ".pm-pulse");
 const WINDOW_EVENTS_DIR = join(DATA_DIR, "window-events");
 const WATCHER_CONFIG_PATH = join(DATA_DIR, "watcher-config.json");
+const LOCK_FILE = join(DATA_DIR, "window-watcher.pid");
 const POLL_INTERVAL_MS = 10_000;
+const SLEEP_DETECT_MULTIPLIER = 4; // >4× poll interval = likely slept
 const FLUSH_INTERVAL_MS = 60_000; // Write partial session every 1 min even if app hasn't changed
 
 // Defaults — overridden by watcher-config.json if present
@@ -32,7 +34,31 @@ try {
   // Config file absent — use defaults
 }
 
+function acquireLock() {
+  try {
+    const existing = readFileSync(LOCK_FILE, "utf8").trim();
+    const pid = parseInt(existing, 10);
+    if (!isNaN(pid)) {
+      try {
+        process.kill(pid, 0); // throws if process not running
+        console.error(`[window-watcher] Already running (PID ${pid}). Exiting.`);
+        process.exit(1);
+      } catch {
+        // stale lock — previous process died without cleanup
+      }
+    }
+  } catch {
+    // file doesn't exist — first run
+  }
+  writeFileSync(LOCK_FILE, String(process.pid));
+}
+
+function releaseLock() {
+  try { unlinkSync(LOCK_FILE); } catch {}
+}
+
 mkdirSync(WINDOW_EVENTS_DIR, { recursive: true });
+acquireLock();
 
 // Map bundle identifiers to friendly display names
 const BUNDLE_ID_MAP = {
@@ -111,6 +137,8 @@ function getActiveApp() {
         script = 'tell application "Microsoft Word" to name of active document';
       } else if (bundleId === "com.microsoft.Excel") {
         script = 'tell application "Microsoft Excel" to name of active workbook';
+      } else if (bundleId === "com.microsoft.Outlook") {
+        script = 'tell application "Microsoft Outlook" to name of main window 1';
       } else {
         script = `tell application "${rawName}" to return name of front window`;
       }
@@ -163,12 +191,27 @@ let current = null; // { app, title, startTime }
 let isIdle = false;
 let idleStart = null;
 let idleWhileBrowser = false; // was a browser frontmost when idle started?
+let lastTickTime = Date.now();
 
 function tick() {
+  const now = Date.now();
+  const elapsed = now - lastTickTime;
+  lastTickTime = now;
+
+  // If we skipped multiple intervals, the process was suspended (machine sleep).
+  // Cap any open session at the last known-good tick time.
+  if (elapsed > POLL_INTERVAL_MS * SLEEP_DETECT_MULTIPLIER && current) {
+    const sessionEndTime = now - elapsed; // end session just before sleep
+    writeSession(current.app, current.title, current.startTime, sessionEndTime);
+    current = null;
+    isIdle = false;
+    idleStart = null;
+    console.log(`[window-watcher] Machine sleep detected (${Math.round(elapsed / 1000)}s gap). Flushed open session.`);
+  }
+
   const active = getActiveApp();
   if (!active) return;
 
-  const now = Date.now();
   const idleSeconds = getIdleSeconds();
   const wasIdle = isIdle;
   isIdle = idleSeconds >= IDLE_THRESHOLD_SECONDS;
@@ -224,8 +267,8 @@ function flush() {
 }
 
 // Graceful shutdown
-process.on("SIGINT", () => { flush(); process.exit(0); });
-process.on("SIGTERM", () => { flush(); process.exit(0); });
+process.on("SIGINT", () => { flush(); releaseLock(); process.exit(0); });
+process.on("SIGTERM", () => { flush(); releaseLock(); process.exit(0); });
 
 console.log("[window-watcher] Started. Polling every 10s. Press Ctrl+C to stop.");
 console.log(`[window-watcher] Writing events to: ${WINDOW_EVENTS_DIR}`);

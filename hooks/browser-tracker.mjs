@@ -20,11 +20,13 @@ const DATA_DIR = join(homedir(), ".pm-pulse");
 const BROWSER_EVENTS_DIR = join(DATA_DIR, "browser-events");
 const WATCHER_CONFIG_PATH = join(DATA_DIR, "watcher-config.json");
 const CURSOR_FILE = join(DATA_DIR, "browser-tracker-cursor.json");
+const LOCK_FILE = join(DATA_DIR, "browser-tracker.pid");
 
 const POLL_INTERVAL_MS = 5_000;
 const MIN_DWELL_SECONDS = 3;
 const MAX_DWELL_SECONDS = 600; // Cap at 10 min (like prompt attribution)
 const PERIODIC_FLUSH_MS = 2 * 60 * 1000; // Flush pending visits every 2 min (captures video watching)
+const SLEEP_DETECT_MULTIPLIER = 4; // > 4× poll interval = machine was suspended
 
 let RETENTION_DAYS = 7;
 try {
@@ -33,6 +35,26 @@ try {
 } catch { /* use defaults */ }
 
 mkdirSync(BROWSER_EVENTS_DIR, { recursive: true });
+
+// --- PID lock ---
+function acquireLock() {
+  try {
+    const existing = readFileSync(LOCK_FILE, "utf8").trim();
+    const pid = parseInt(existing, 10);
+    if (!isNaN(pid)) {
+      try {
+        process.kill(pid, 0);
+        console.error(`[browser-tracker] Already running (PID ${pid}). Exiting.`);
+        process.exit(1);
+      } catch { /* stale lock — proceed */ }
+    }
+  } catch { /* no lock file — proceed */ }
+  writeFileSync(LOCK_FILE, String(process.pid));
+}
+
+function releaseLock() {
+  try { unlinkSync(LOCK_FILE); } catch {}
+}
 
 // Chromium browsers: bundle ID → name + history path
 const CHROMIUM_BROWSERS = {
@@ -173,8 +195,26 @@ let frontSince = 0; // timestamp when browser became frontmost
 // Hold-back: last in-progress visit per browser — don't emit until we know its true end time
 let pendingLastVisits = {}; // bundleId → { uuid, browser, url, title, startMs }
 
+let lastTickTime = Date.now();
+
 function tick() {
   const now = Date.now();
+  const elapsed = now - lastTickTime;
+  lastTickTime = now;
+
+  // Sleep/wake detection: if elapsed > 4× poll interval, the process was suspended
+  if (elapsed > POLL_INTERVAL_MS * SLEEP_DETECT_MULTIPLIER) {
+    const count = Object.keys(pendingLastVisits).length;
+    if (count > 0) {
+      const sleepEndTime = now - elapsed; // approximate pre-sleep timestamp
+      for (const [, pending] of Object.entries(pendingLastVisits)) {
+        writeVisitEvent(pending.browser, pending.uuid, pending.url, pending.title, pending.startMs, sleepEndTime);
+      }
+      pendingLastVisits = {};
+      console.log(`[browser-tracker] Machine sleep detected (${Math.round(elapsed / 1000)}s gap). Cleared ${count} pending visit(s).`);
+    }
+  }
+
   const frontBundleId = getFrontmostBundleId();
   const isBrowserFront = frontBundleId && frontBundleId in CHROMIUM_BROWSERS;
 
@@ -242,10 +282,11 @@ function flush() {
   saveCursors();
 }
 
-process.on("SIGINT", () => { flush(); process.exit(0); });
-process.on("SIGTERM", () => { flush(); process.exit(0); });
+process.on("SIGINT", () => { flush(); releaseLock(); process.exit(0); });
+process.on("SIGTERM", () => { flush(); releaseLock(); process.exit(0); });
 
 // --- Startup ---
+acquireLock();
 loadCursors();
 
 // On first run, seed cursor to visits from the last 2 hours (captures recent activity)

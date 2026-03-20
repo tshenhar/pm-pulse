@@ -105,6 +105,34 @@ export function getDb(): Database.Database {
     `);
   }
 
+  // Migrations: initiative_slug columns
+  try { _db.exec("ALTER TABLE prompts ADD COLUMN initiative_slug TEXT"); } catch {}
+  try { _db.exec("ALTER TABLE window_events ADD COLUMN initiative_slug TEXT"); } catch {}
+  try { _db.exec("ALTER TABLE browser_events ADD COLUMN initiative_slug TEXT"); } catch {}
+
+  // Create initiatives and daily_scores tables (idempotent)
+  _db.exec(`
+    CREATE TABLE IF NOT EXISTS initiatives (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      slug TEXT UNIQUE NOT NULL,
+      keywords TEXT NOT NULL DEFAULT '[]',
+      color TEXT NOT NULL DEFAULT '#6366f1',
+      is_active INTEGER DEFAULT 1,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS daily_scores (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      date TEXT UNIQUE NOT NULL,
+      score REAL NOT NULL,
+      strategic_score REAL NOT NULL,
+      focus_score REAL NOT NULL,
+      reactive_score REAL NOT NULL,
+      computed_at TEXT DEFAULT (datetime('now'))
+    );
+  `);
+
   // Phase 9: training loop tables (CREATE IF NOT EXISTS — schema handles it above,
   // but listed here for clarity on migration order)
   _db.exec(`

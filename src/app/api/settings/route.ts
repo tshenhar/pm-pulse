@@ -72,7 +72,7 @@ export async function PUT(request: Request): Promise<NextResponse> {
           if (value !== "" && !value.startsWith("https://")) continue; // SSRF guard
         }
         if (key === "calendar_block_keyword") {
-          if (typeof value !== "string" || value.length > 50) continue;
+          if (typeof value !== "string" || value.length > 200) continue;
         }
         // Validate boolean fields
         if (key === "window_tracking_enabled" && typeof value !== "boolean") continue;

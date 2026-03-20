@@ -26,6 +26,12 @@ import {
   Monitor,
   Pencil,
   GripVertical,
+  ArrowUpDown,
+  ArrowUp,
+  AlertTriangle,
+  Zap,
+  ArrowDown,
+  BookOpen,
 } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,6 +47,7 @@ import {
 import { LOW_CONFIDENCE_THRESHOLD } from "@/lib/constants";
 import { shiftDate, currentWorkday } from "@/lib/date-utils";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
+import { getCached, setCached, invalidateCache } from "@/lib/client-cache";
 const TOOLTIP_STYLE = {
   contentStyle: {
     backgroundColor: "var(--color-popover)",
@@ -66,8 +73,16 @@ const DEFAULT_LABELS: Record<string, string> = {
   "tooltip-meetings": "Meetings synced from your calendar. Connect via ICS URL in Settings to populate this.",
   "title-focus-time": "Focus Time",
   "tooltip-focus-time": "Total time minus meetings - your actual heads-down work hours today.",
-  "title-top-category": "Top Category",
-  "tooltip-top-category": "Highest-time PM category today, from 7 types: Strategy, Requirements, Communication, Writing, Analytics, Dev, Productivity.",
+  "title-focus-score": "Focus Score",
+  "tooltip-focus-score": "0-100 score based on context switches and category affinity. High = fewer costly switches. Low = fragmented day.",
+  "title-timeline": "Day Timeline",
+  "tooltip-timeline": "Horizontal timeline of all tracked events by source. Click a block to inspect it.",
+  "title-focus-sessions": "Deep Focus",
+  "tooltip-focus-sessions": "Sustained single-app sessions: Deep (≥30 min) and Light (15-30 min).",
+  "title-daily-pulse": "Today's Pulse",
+  "tooltip-daily-pulse": "Auto-generated insights about your day's working patterns.",
+  "title-productivity-score": "Productivity Score",
+  "tooltip-productivity-score": "0-100 score based on strategic depth (40%), focus quality (35%), and reactive ratio (25%).",
 };
 
 function getLabel(key: string, labels: Record<string, string>): string {
@@ -82,7 +97,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { DashboardData, ActivitySummary, SourceBreakdown } from "@/lib/types";
+import type { DashboardData, ActivitySummary, SourceBreakdown, FocusSessions } from "@/lib/types";
+import { computeFocusScore } from "@/lib/focus-score";
+import { generateDailyPulse } from "@/lib/daily-pulse";
 import {
   DndContext,
   type DragEndEvent,
@@ -296,6 +313,8 @@ function SortableCard({
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id, disabled: !isEditMode || disabled });
+  const cardRef = React.useRef<HTMLDivElement | null>(null);
+
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -303,8 +322,34 @@ function SortableCard({
     zIndex: isDragging ? 1 : undefined,
     gridColumn: `span ${Math.min(span, maxSpan)}`,
   };
+
+  function handleResizeMouseDown(e: React.MouseEvent) {
+    if (!isEditMode || maxSpan <= 1) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startSpan = span;
+    const colWidth = cardRef.current ? cardRef.current.offsetWidth / startSpan : 300;
+
+    function onMove(ev: MouseEvent) {
+      const deltaX = ev.clientX - startX;
+      const newSpan = Math.max(1, Math.min(maxSpan, Math.round((startSpan * colWidth + deltaX) / colWidth)));
+      onSpanChange(id, newSpan);
+    }
+    function onUp() {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    }
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }
+
   return (
-    <div ref={setNodeRef} style={style}>
+    <div
+      ref={(node) => { setNodeRef(node); cardRef.current = node; }}
+      style={style}
+      className="flex flex-col"
+    >
       {isEditMode && (
         <div className="flex items-center gap-2 mb-1 px-1">
           <button
@@ -315,23 +360,21 @@ function SortableCard({
           >
             <GripVertical className="size-4" />
           </button>
-          <span className="text-xs text-muted-foreground">Drag</span>
-          <div className="ml-auto flex items-center gap-0.5 rounded border p-0.5">
-            {Array.from({ length: maxSpan }, (_, i) => i + 1).map((n) => (
-              <button
-                key={n}
-                type="button"
-                onClick={() => onSpanChange(id, n)}
-                className={`px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors ${span === n ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
-                title={`Span ${n} column${n > 1 ? "s" : ""}`}
-              >
-                {n}
-              </button>
-            ))}
-          </div>
+          <span className="text-xs text-muted-foreground">Drag to reorder</span>
         </div>
       )}
-      {children}
+      <div className="flex-1 relative">
+        {children}
+        {isEditMode && maxSpan > 1 && (
+          <div
+            onMouseDown={handleResizeMouseDown}
+            className="absolute right-0 top-0 bottom-0 w-4 flex items-center justify-center cursor-col-resize z-10 group"
+            title="Drag to resize width"
+          >
+            <div className="h-10 w-1.5 rounded-full bg-border group-hover:bg-primary transition-colors" />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -348,15 +391,17 @@ export default function Dashboard() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [loadingDemo, setLoadingDemo] = useState(false);
   const [pageSize, setPageSize] = useState<10 | 50 | 100>(10);
+  const [sortCol, setSortCol] = useState<"time" | "source" | "category" | "confidence" | "duration" | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [isEditMode, setIsEditMode] = useState(false);
-  const [cardOrder, setCardOrder] = useState(["category", "source", "activity"]);
+  const [cardOrder, setCardOrder] = useState(["daily-pulse", "timeline", "focus-sessions", "category", "source", "activity"]);
   const [dashColCount, setDashColCount] = useState(2);
   const [cardSpans, setCardSpans] = useState<Record<string, number>>({});
   const [pendingSpans, setPendingSpans] = useState<Record<string, number>>({});
   const [customLabels, setCustomLabels] = useState<Record<string, string>>({});
   const [pendingLabels, setPendingLabels] = useState<Record<string, string>>({});
   const [isSavingLayout, setIsSavingLayout] = useState(false);
-  const savedCardOrderRef = React.useRef(["category", "source", "activity"]);
+  const savedCardOrderRef = React.useRef(["daily-pulse", "timeline", "focus-sessions", "category", "source", "activity"]);
   const savedSpansRef = React.useRef<Record<string, number>>({});
 
   const fetchData = useCallback(async () => {
@@ -369,6 +414,10 @@ export default function Dashboard() {
       setData(json);
       setAutoRefresh(json.auto_refresh ?? false);
       setLastRefreshed(new Date());
+      // Background ingestion was triggered — re-fetch once it completes
+      if (json.needs_refresh) {
+        setTimeout(fetchData, 1500);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load");
     } finally {
@@ -387,39 +436,51 @@ export default function Dashboard() {
   }, [autoRefresh, fetchData]);
 
   useEffect(() => {
-    fetch("/api/categories")
-      .then((r) => r.json())
-      .then(setCategories)
-      .catch(() => {});
+    const cachedCats = getCached<CategoryOption[]>("categories");
+    if (cachedCats) {
+      setCategories(cachedCats);
+    } else {
+      fetch("/api/categories")
+        .then((r) => r.json())
+        .then((d) => { setCategories(d); setCached("categories", d, 3_600_000); })
+        .catch(() => {});
+    }
     fetch("/api/onboarding")
       .then((r) => r.json())
       .then((d) => {
         if (d.is_first_run && !d.onboarding_dismissed) setShowOnboarding(true);
       })
       .catch(() => {});
-    fetch("/api/settings")
-      .then((r) => r.json())
-      .then((s) => {
-        const validIds = new Set(["category", "source", "activity"]);
-        const raw: unknown = s.dashboard_card_order;
-        const order =
-          Array.isArray(raw) &&
-          raw.length === 3 &&
-          raw.every((id) => typeof id === "string" && validIds.has(id)) &&
-          new Set(raw).size === 3
-            ? (raw as string[])
-            : ["category", "source", "activity"];
-        setCardOrder(order);
-        if ([2, 3].includes(s.dashboard_col_count)) setDashColCount(s.dashboard_col_count);
-        if (s.dashboard_card_spans && typeof s.dashboard_card_spans === "object") {
-          setCardSpans(s.dashboard_card_spans as Record<string, number>);
-          savedSpansRef.current = s.dashboard_card_spans as Record<string, number>;
-        }
-        if (s.dashboard_labels && typeof s.dashboard_labels === "object") {
-          setCustomLabels(s.dashboard_labels as Record<string, string>);
-        }
-      })
-      .catch(() => {});
+    function applySettings(s: Record<string, unknown>) {
+      const validIds = new Set(["category", "source", "activity", "timeline", "focus-sessions", "daily-pulse", "productivity-score"]);
+      const raw: unknown = s.dashboard_card_order;
+      const DEFAULT_CARD_ORDER = ["daily-pulse", "productivity-score", "timeline", "focus-sessions", "category", "source", "activity"];
+      const order =
+        Array.isArray(raw) &&
+        raw.length >= 1 &&
+        raw.every((id) => typeof id === "string" && validIds.has(id)) &&
+        new Set(raw).size === raw.length
+          ? (raw as string[])
+          : DEFAULT_CARD_ORDER;
+      setCardOrder(order);
+      if ([2, 3].includes(s.dashboard_col_count as number)) setDashColCount(s.dashboard_col_count as number);
+      if (s.dashboard_card_spans && typeof s.dashboard_card_spans === "object") {
+        setCardSpans(s.dashboard_card_spans as Record<string, number>);
+        savedSpansRef.current = s.dashboard_card_spans as Record<string, number>;
+      }
+      if (s.dashboard_labels && typeof s.dashboard_labels === "object") {
+        setCustomLabels(s.dashboard_labels as Record<string, string>);
+      }
+    }
+    const cachedSettings = getCached<Record<string, unknown>>("settings");
+    if (cachedSettings) {
+      applySettings(cachedSettings);
+    } else {
+      fetch("/api/settings")
+        .then((r) => r.json())
+        .then((s) => { applySettings(s); setCached("settings", s, 60_000); })
+        .catch(() => {});
+    }
   }, []);
 
   // Keyboard navigation
@@ -477,6 +538,7 @@ export default function Dashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ dashboard_card_order: cardOrder, dashboard_labels: labelsToSave, dashboard_col_count: dashColCount, dashboard_card_spans: pendingSpans }),
       });
+      invalidateCache("settings");
       setCustomLabels(labelsToSave);
       setCardSpans(pendingSpans);
       savedSpansRef.current = pendingSpans;
@@ -508,6 +570,224 @@ export default function Dashboard() {
   const sidebarOpen = selectedActivity !== null;
   const totalEvents = data?.total_events ?? 0;
 
+  const focusScore = React.useMemo(
+    () => computeFocusScore(data?.activities ?? [], data?.total_hours ?? 0),
+    [data]
+  );
+  const dailyPulse = React.useMemo(
+    () => data ? generateDailyPulse(data, focusScore, !!(data.yesterday)) : [],
+    [data, focusScore]
+  );
+
+  // Feature 5: Daily Pulse Card
+  function renderDailyPulseCard() {
+    if (loading) {
+      return (
+        <Card>
+          <CardHeader><div className="h-5 w-32 rounded bg-muted animate-pulse" /></CardHeader>
+          <CardContent><div className="h-16 rounded-lg bg-muted animate-pulse" /></CardContent>
+        </Card>
+      );
+    }
+    if (!data || totalEvents === 0) return null;
+    return (
+      <Card className="h-full">
+        <CardHeader>
+          <div className="flex items-center gap-1.5">
+            <CardTitle>
+              <EditableLabel labelKey="title-daily-pulse" isEditMode={isEditMode} labels={activeLabels} onUpdate={updateLabel} />
+            </CardTitle>
+            <EditableTooltip labelKey="tooltip-daily-pulse" isEditMode={isEditMode} labels={activeLabels} onUpdate={updateLabel} />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-1.5">
+            {dailyPulse.map((sentence, i) => (
+              <p key={i} className="text-sm italic text-muted-foreground leading-relaxed">{sentence}</p>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Feature 3: Focus Sessions Card
+  function renderFocusSessionsCard() {
+    if (loading) {
+      return (
+        <Card>
+          <CardHeader><div className="h-5 w-32 rounded bg-muted animate-pulse" /></CardHeader>
+          <CardContent><div className="h-28 rounded-lg bg-muted animate-pulse" /></CardContent>
+        </Card>
+      );
+    }
+    const fs: FocusSessions | undefined = data?.focus_sessions;
+    if (!data || !fs || (fs.deep_count === 0 && fs.light_count === 0)) return null;
+    return (
+      <Card className="h-full">
+        <CardHeader>
+          <div className="flex items-center gap-1.5">
+            <CardTitle>
+              <EditableLabel labelKey="title-focus-sessions" isEditMode={isEditMode} labels={activeLabels} onUpdate={updateLabel} />
+            </CardTitle>
+            <EditableTooltip labelKey="tooltip-focus-sessions" isEditMode={isEditMode} labels={activeLabels} onUpdate={updateLabel} />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            <div className="flex gap-4">
+              <div>
+                <p className="text-xs text-muted-foreground">Deep (≥30m)</p>
+                <p className="text-lg font-semibold">{fs.deep_count > 0 ? formatMinutes(fs.deep_minutes) : "—"}</p>
+                {fs.deep_count > 0 && <p className="text-xs text-muted-foreground">{fs.deep_count} session{fs.deep_count > 1 ? "s" : ""}</p>}
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Light (15–30m)</p>
+                <p className="text-lg font-semibold">{fs.light_count > 0 ? formatMinutes(fs.light_minutes) : "—"}</p>
+                {fs.light_count > 0 && <p className="text-xs text-muted-foreground">{fs.light_count} session{fs.light_count > 1 ? "s" : ""}</p>}
+              </div>
+            </div>
+            {fs.longest_app && (
+              <p className="text-xs text-muted-foreground">
+                Longest: <span className="font-medium text-foreground">{fs.longest_app}</span> ({formatMinutes(fs.longest_minutes)})
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Feature: Productivity Score Card
+  function renderProductivityScoreCard() {
+    if (loading) {
+      return (
+        <Card>
+          <CardHeader><div className="h-5 w-40 rounded bg-muted animate-pulse" /></CardHeader>
+          <CardContent><div className="h-24 rounded-lg bg-muted animate-pulse" /></CardContent>
+        </Card>
+      );
+    }
+    const ps = data?.productivity_score;
+    if (!ps) return null;
+    const labelColor = ps.label === "Focus Day" ? "text-emerald-600 dark:text-emerald-400"
+      : ps.label === "Reactive Day" ? "text-amber-600 dark:text-amber-400"
+      : "text-blue-600 dark:text-blue-400";
+    return (
+      <Card className="h-full">
+        <CardHeader>
+          <div className="flex items-center gap-1.5">
+            <CardTitle>
+              <EditableLabel labelKey="title-productivity-score" isEditMode={isEditMode} labels={activeLabels} onUpdate={updateLabel} />
+            </CardTitle>
+            <EditableTooltip labelKey="tooltip-productivity-score" isEditMode={isEditMode} labels={activeLabels} onUpdate={updateLabel} />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            <div className="flex items-end gap-2">
+              <span className="text-4xl font-bold">{ps.score}</span>
+              <span className="text-muted-foreground text-sm mb-1">/100</span>
+              <span className={`ml-auto text-sm font-medium ${labelColor}`}>{ps.label}</span>
+            </div>
+            <div className="space-y-1.5 text-xs text-muted-foreground">
+              <div className="flex items-center justify-between">
+                <span>Strategic depth</span>
+                <span className="font-medium text-foreground">{ps.strategic_pct}%</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Focus time</span>
+                <span className="font-medium text-foreground">{formatMinutes(ps.focus_minutes)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Reactive work</span>
+                <span className="font-medium text-foreground">{ps.reactive_pct}%</span>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Feature 2: Day Timeline Card
+  function renderTimelineCard() {
+    if (loading) {
+      return (
+        <Card>
+          <CardHeader><div className="h-5 w-32 rounded bg-muted animate-pulse" /></CardHeader>
+          <CardContent><div className="h-36 rounded-lg bg-muted animate-pulse" /></CardContent>
+        </Card>
+      );
+    }
+    if (!data || totalEvents === 0) return null;
+    const dayStartIso = data.day_start_iso || new Date(date + "T08:00:00").toISOString();
+    const dayStartMs = new Date(dayStartIso).getTime();
+    const dayEndMs = dayStartMs + 24 * 60 * 60 * 1000;
+    const nowMs = Math.min(Date.now(), dayEndMs);
+    const totalMs = nowMs - dayStartMs;
+
+    const SOURCE_ROWS: { source: ActivitySummary["source"]; label: string; color: string }[] = [
+      { source: "prompt", label: "Claude", color: "bg-indigo-500" },
+      { source: "calendar", label: "Meetings", color: "bg-blue-500" },
+      { source: "window", label: "Apps", color: "bg-amber-500" },
+      { source: "browser", label: "Browser", color: "bg-emerald-500" },
+    ];
+
+    const activitiesBySource = new Map<ActivitySummary["source"], ActivitySummary[]>();
+    for (const a of data.activities) {
+      if (!activitiesBySource.has(a.source)) activitiesBySource.set(a.source, []);
+      activitiesBySource.get(a.source)!.push(a);
+    }
+
+    return (
+      <Card className="h-full">
+        <CardHeader>
+          <div className="flex items-center gap-1.5">
+            <CardTitle>
+              <EditableLabel labelKey="title-timeline" isEditMode={isEditMode} labels={activeLabels} onUpdate={updateLabel} />
+            </CardTitle>
+            <EditableTooltip labelKey="tooltip-timeline" isEditMode={isEditMode} labels={activeLabels} onUpdate={updateLabel} />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            {SOURCE_ROWS.map(({ source, label, color }) => {
+              const evts = activitiesBySource.get(source) ?? [];
+              return (
+                <div key={source} className="flex items-center gap-2">
+                  <span className="w-16 text-xs text-muted-foreground shrink-0 text-right">{label}</span>
+                  <div className="relative flex-1 h-6 bg-muted rounded overflow-hidden">
+                    {evts.map((a) => {
+                      const startMs = new Date(a.timestamp).getTime();
+                      const durationMs = a.attributed_minutes * 60 * 1000;
+                      const left = Math.max(0, ((startMs - dayStartMs) / totalMs) * 100);
+                      const width = Math.max(0.5, (durationMs / totalMs) * 100);
+                      if (left > 100) return null;
+                      return (
+                        <button
+                          key={`${a.source}-${a.id}`}
+                          className={`absolute top-0 h-full ${color} opacity-80 hover:opacity-100 cursor-pointer transition-opacity`}
+                          style={{ left: `${left}%`, width: `${Math.min(width, 100 - left)}%` }}
+                          onClick={() => setSelectedActivity(a)}
+                          title={`${a.title} (${formatMinutes(a.attributed_minutes)})`}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+            <div className="flex pl-[4.5rem] text-[10px] text-muted-foreground/60 justify-between">
+              <span>{new Date(dayStartIso).toLocaleTimeString("en-US", { hour: "numeric", hour12: true })}</span>
+              <span>{new Date(nowMs).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   function renderCategoryCard() {
     if (loading) {
       return (
@@ -519,7 +799,7 @@ export default function Dashboard() {
     }
     if (!data || totalEvents === 0) return null;
     return (
-      <Card>
+      <Card className="h-full">
         <CardHeader>
           <div className="flex items-center gap-1.5">
             <CardTitle>
@@ -578,7 +858,7 @@ export default function Dashboard() {
     }
     if (!data || totalEvents === 0) return null;
     return (
-      <Card>
+      <Card className="h-full">
         <CardHeader>
           <div className="flex items-center gap-1.5">
             <CardTitle>
@@ -621,7 +901,7 @@ export default function Dashboard() {
     }
     if (!data || !data.activities || data.activities.length === 0) return null;
     return (
-      <Card>
+      <Card className="h-full">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
@@ -663,34 +943,43 @@ export default function Dashboard() {
             <TableHeader>
               <TableRow>
                 <TableHead className="pl-4 w-8" />
-                <TableHead>Time</TableHead>
-                <TableHead>Source</TableHead>
+                <SortableHead col="time" label="Time" sortCol={sortCol} sortDir={sortDir} onSort={(c) => { if (sortCol === c) setSortDir(d => d === "asc" ? "desc" : "asc"); else { setSortCol(c); setSortDir("asc"); } }} />
+                <SortableHead col="source" label="Source" sortCol={sortCol} sortDir={sortDir} onSort={(c) => { if (sortCol === c) setSortDir(d => d === "asc" ? "desc" : "asc"); else { setSortCol(c); setSortDir("asc"); } }} />
                 <TableHead>Activity</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Confidence</TableHead>
-                <TableHead className="text-right pr-4">Duration</TableHead>
+                <SortableHead col="category" label="Category" sortCol={sortCol} sortDir={sortDir} onSort={(c) => { if (sortCol === c) setSortDir(d => d === "asc" ? "desc" : "asc"); else { setSortCol(c); setSortDir("asc"); } }} />
+                <SortableHead col="confidence" label="Confidence" sortCol={sortCol} sortDir={sortDir} onSort={(c) => { if (sortCol === c) setSortDir(d => d === "asc" ? "desc" : "asc"); else { setSortCol(c); setSortDir("asc"); } }} />
+                <SortableHead col="duration" label="Duration" className="text-right pr-4" sortCol={sortCol} sortDir={sortDir} onSort={(c) => { if (sortCol === c) setSortDir(d => d === "asc" ? "desc" : "asc"); else { setSortCol(c); setSortDir("desc"); } }} />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {data.activities.slice(-pageSize).map((activity) => (
-                <ActivityTableRow
-                  key={`${activity.source}-${activity.id}`}
-                  activity={activity}
-                  selected={selectedActivity?.source === activity.source && selectedActivity?.id === activity.id}
-                  onSelect={() =>
-                    setSelectedActivity(
-                      selectedActivity?.source === activity.source && selectedActivity?.id === activity.id
-                        ? null
-                        : activity
-                    )
-                  }
-                />
-              ))}
+              {(() => {
+                const catColorMap = new Map(data.category_breakdown.map((c) => [c.category, c.color]));
+                const sorted = sortCol
+                  ? sortActivities(data.activities, sortCol, sortDir).slice(0, pageSize)
+                  : data.activities.slice(-pageSize);
+                return sorted.map((activity) => (
+                  <ActivityTableRow
+                    key={`${activity.source}-${activity.id}`}
+                    activity={activity}
+                    selected={selectedActivity?.source === activity.source && selectedActivity?.id === activity.id}
+                    categoryColor={catColorMap.get(activity.primary_category)}
+                    onSelect={() =>
+                      setSelectedActivity(
+                        selectedActivity?.source === activity.source && selectedActivity?.id === activity.id
+                          ? null
+                          : activity
+                      )
+                    }
+                  />
+                ));
+              })()}
             </TableBody>
           </Table>
           {data.activities.length > pageSize && (
             <p className="px-4 py-2 text-xs text-muted-foreground text-center">
-              Showing latest {pageSize} of {data.activities.length}
+              {sortCol
+                ? `Showing top ${pageSize} of ${data.activities.length} (sorted)`
+                : `Showing latest ${pageSize} of ${data.activities.length}`}
             </p>
           )}
         </CardContent>
@@ -703,16 +992,39 @@ export default function Dashboard() {
       {/* Header */}
       <header className="border-b sticky top-0 z-10 bg-background/95 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold">
-              P
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold">
+                P
+              </div>
+              <h1 className="text-lg font-semibold">PM Pulse</h1>
             </div>
-            <h1 className="text-lg font-semibold">PM Pulse</h1>
+            {data && (
+              <div className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border ${
+                data.total_events > 0
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-400"
+                  : "border-border bg-muted/40 text-muted-foreground"
+              }`}>
+                <span className={`size-1.5 rounded-full ${
+                  data.total_events > 0
+                    ? autoRefresh ? "bg-emerald-500 animate-pulse" : "bg-emerald-500"
+                    : "bg-muted-foreground/40"
+                }`} />
+                {data.total_events > 0
+                  ? `${data.total_events} event${data.total_events === 1 ? "" : "s"} today`
+                  : "No events yet"}
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <Link href="/trends">
               <Button variant="ghost" size="icon-sm" aria-label="Trends">
                 <TrendingUp className="size-4" />
+              </Button>
+            </Link>
+            <Link href="/digest">
+              <Button variant="ghost" size="icon-sm" aria-label="Weekly Digest">
+                <BookOpen className="size-4" />
               </Button>
             </Link>
             <Link href="/training">
@@ -725,16 +1037,6 @@ export default function Dashboard() {
                 <Settings className="size-4" />
               </Button>
             </Link>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Export CSV"
-              title="Export CSV"
-              disabled={!data || totalEvents === 0}
-              onClick={() => data && exportToCsv(data)}
-            >
-              <Download className="size-4" />
-            </Button>
             {isEditMode ? (
               <>
                 <div className="flex items-center gap-1 rounded-md border p-0.5 text-xs">
@@ -892,6 +1194,26 @@ export default function Dashboard() {
             <h2 className="text-sm text-muted-foreground">{greetingDate(date)}</h2>
           </div>
 
+          {/* Anomaly Alerts */}
+          {data?.anomaly_alerts && data.anomaly_alerts.length > 0 && (
+            <div className="space-y-2">
+              {data.anomaly_alerts.map((alert, i) => (
+                <div key={i} className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-sm ${alert.severity === "warning" ? "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800/40 dark:bg-amber-900/20 dark:text-amber-300" : "border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-800/40 dark:bg-blue-900/20 dark:text-blue-300"}`}>
+                  <AlertTriangle className="size-4 mt-0.5 shrink-0" />
+                  <span>{alert.message}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Parallel Work Banner */}
+          {data?.parallel_work_detected && (
+            <div className="flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm text-violet-800 dark:border-violet-800/40 dark:bg-violet-900/20 dark:text-violet-300">
+              <Zap className="size-4 shrink-0" />
+              <span>Parallel sessions detected - {formatMinutes(data.parallel_minutes ?? 0)} attributed across {data.parallel_sessions} sessions (wall-clock shorter)</span>
+            </div>
+          )}
+
           {/* Summary Cards */}
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             {loading ? (
@@ -945,12 +1267,13 @@ export default function Dashboard() {
                 />
                 <SummaryCard
                   icon={<Trophy className="size-4" />}
-                  label={getLabel("title-top-category", activeLabels)}
-                  value={data?.category_breakdown?.[0]?.name?.split(" & ")[0] ?? "--"}
-                  info={getLabel("tooltip-top-category", activeLabels)}
+                  label={getLabel("title-focus-score", activeLabels)}
+                  value={data ? `${focusScore.score}/100` : "--"}
+                  subtitle={data ? `${focusScore.transitions} switch${focusScore.transitions === 1 ? "" : "es"}` : undefined}
+                  info={getLabel("tooltip-focus-score", activeLabels)}
                   isEditMode={isEditMode}
-                  labelKey="title-top-category"
-                  tooltipKey="tooltip-top-category"
+                  labelKey="title-focus-score"
+                  tooltipKey="tooltip-focus-score"
                   pendingLabels={pendingLabels}
                   onUpdateLabel={updateLabel}
                 />
@@ -970,6 +1293,10 @@ export default function Dashboard() {
                     {id === "category" && renderCategoryCard()}
                     {id === "source" && renderSourceCard()}
                     {id === "activity" && renderActivityCard()}
+                    {id === "timeline" && renderTimelineCard()}
+                    {id === "focus-sessions" && renderFocusSessionsCard()}
+                    {id === "daily-pulse" && renderDailyPulseCard()}
+                    {id === "productivity-score" && renderProductivityScoreCard()}
                   </SortableCard>
                 ))}
               </div>
@@ -1005,6 +1332,7 @@ export default function Dashboard() {
               <DetailSidebar
                 key={`${selectedActivity.source}-${selectedActivity.id}`}
                 activity={selectedActivity}
+                activities={data?.activities ?? []}
                 categories={categories}
                 onClose={() => setSelectedActivity(null)}
                 onReclassified={() => {
@@ -1020,20 +1348,66 @@ export default function Dashboard() {
   );
 }
 
+type SortCol = "time" | "source" | "category" | "confidence" | "duration";
+
+function SortableHead({ col, label, sortCol, sortDir, onSort, className }: {
+  col: SortCol;
+  label: string;
+  sortCol: SortCol | null;
+  sortDir: "asc" | "desc";
+  onSort: (col: SortCol) => void;
+  className?: string;
+}) {
+  const active = sortCol === col;
+  return (
+    <TableHead className={className}>
+      <button
+        onClick={() => onSort(col)}
+        className="flex items-center gap-1 hover:text-foreground transition-colors group"
+      >
+        {label}
+        {active ? (
+          sortDir === "asc" ? <ArrowUp className="size-3" /> : <ArrowDown className="size-3" />
+        ) : (
+          <ArrowUpDown className="size-3 opacity-0 group-hover:opacity-40 transition-opacity" />
+        )}
+      </button>
+    </TableHead>
+  );
+}
+
+function sortActivities(activities: ActivitySummary[], col: SortCol | null, dir: "asc" | "desc"): ActivitySummary[] {
+  if (!col) return activities;
+  const mult = dir === "asc" ? 1 : -1;
+  return [...activities].sort((a, b) => {
+    switch (col) {
+      case "time": return mult * a.timestamp.localeCompare(b.timestamp);
+      case "source": return mult * a.source.localeCompare(b.source);
+      case "category": return mult * `${a.primary_category}/${a.primary_subcategory}`.localeCompare(`${b.primary_category}/${b.primary_subcategory}`);
+      case "confidence": return mult * (a.primary_confidence - b.primary_confidence);
+      case "duration": return mult * (a.attributed_minutes - b.attributed_minutes);
+      default: return 0;
+    }
+  });
+}
+
 function ActivityTableRow({
   activity,
   selected,
   onSelect,
+  categoryColor,
 }: {
   activity: ActivitySummary;
   selected: boolean;
   onSelect: () => void;
+  categoryColor?: string;
 }) {
   const isLowConfidence = activity.source !== "calendar" && activity.primary_confidence < LOW_CONFIDENCE_THRESHOLD;
   return (
     <TableRow
       className={`cursor-pointer ${isLowConfidence ? "opacity-70" : ""} ${selected ? "bg-muted/50" : ""}`}
       onClick={onSelect}
+      style={categoryColor ? { boxShadow: `inset 3px 0 0 ${categoryColor}` } : undefined}
     >
       <TableCell className="pl-4 w-8">
         <ChevronDown
@@ -1081,11 +1455,13 @@ function ActivityTableRow({
 
 function DetailSidebar({
   activity,
+  activities,
   categories,
   onClose,
   onReclassified,
 }: {
   activity: ActivitySummary;
+  activities: ActivitySummary[];
   categories: { slug: string; name: string; subcategories: { slug: string; name: string }[] }[];
   onClose: () => void;
   onReclassified: () => void;
@@ -1097,6 +1473,36 @@ function DetailSidebar({
 
   const subcategories =
     categories.find((c) => c.slug === selectedCat)?.subcategories ?? [];
+
+  // Gap inference: find window/browser events between this prompt and the next prompt
+  const gapActivities = React.useMemo(() => {
+    if (activity.source !== "prompt") return null;
+    const sorted = [...activities].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+    const idx = sorted.findIndex(a => a.source === "prompt" && a.id === activity.id);
+    if (idx === -1) return null;
+    const nextPromptIdx = sorted.findIndex((a, i) => i > idx && a.source === "prompt");
+    const gapEnd = nextPromptIdx === -1 ? null : sorted[nextPromptIdx].timestamp;
+    const gapStart = activity.timestamp;
+    // Filter window + browser events in the gap
+    const gapEvents = sorted.filter(a =>
+      (a.source === "window" || a.source === "browser") &&
+      a.timestamp >= gapStart &&
+      (gapEnd === null || a.timestamp < gapEnd)
+    );
+    if (gapEvents.length === 0) return null;
+    // Group by app/domain and sum minutes
+    const byKey = new Map<string, number>();
+    for (const e of gapEvents) {
+      const key = e.source === "browser"
+        ? (e.title || "Browser")
+        : e.title.split(" - ")[0]; // app name only
+      byKey.set(key, (byKey.get(key) ?? 0) + e.attributed_minutes);
+    }
+    return Array.from(byKey.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([key, mins]) => ({ key, mins }));
+  }, [activity, activities]);
 
   const hasChanged =
     selectedCat !== activity.primary_category ||
@@ -1152,6 +1558,11 @@ function DetailSidebar({
         </div>
 
         {/* Source-specific extras */}
+        {activity.source === "window" && activity.window_title && (
+          <div className="grid grid-cols-1 gap-2">
+            <SidebarDetailItem label="Window Title" value={activity.window_title} />
+          </div>
+        )}
         {activity.source === "calendar" && (
           <div className="grid grid-cols-2 gap-2">
             {activity.attendee_count !== undefined && (
@@ -1205,6 +1616,27 @@ function DetailSidebar({
                 <SidebarDetailItem label="Quality" value={activity.time_confidence} />
               )}
             </div>
+          </div>
+        )}
+
+        {/* Gap Activity — between this prompt and the next */}
+        {gapActivities && gapActivities.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">Between this and next prompt</p>
+            <div className="flex flex-wrap gap-1.5">
+              {gapActivities.map(({ key, mins }) => (
+                <span key={key} className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">{formatMinutes(mins)}</span>
+                  {key}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+        {activity.source === "prompt" && (!gapActivities || gapActivities.length === 0) && (
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-muted-foreground">Between this and next prompt</p>
+            <p className="text-xs text-muted-foreground/60">No app activity captured in gap.</p>
           </div>
         )}
 
